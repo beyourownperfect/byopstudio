@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Plus, Trash2, Clock, Play, Pause, Square } from "lucide-react";
+import { Plus, Trash2, Clock, Play, Pause, Square, ChevronDown } from "lucide-react";
 import { logsApi } from "@/lib/api";
 import { SUBJECTS, ACTIVITIES, TID } from "@/lib/constants";
 import { todayISO, fmtDate, fmtDuration, isoAdd } from "@/lib/dateUtils";
@@ -52,6 +52,7 @@ export default function Log() {
   const [view, setView] = useState("daily"); // daily, weekly, monthly
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [expandedDates, setExpandedDates] = useState({});
 
   // Stopwatch state shared with the modal
   const sw = useStopwatch();
@@ -125,6 +126,21 @@ export default function Log() {
     return acc;
   }, {});
   const dates = Object.keys(byDate).sort().reverse();
+  const datesKey = dates.join("|");
+
+  useEffect(() => {
+    setExpandedDates((prev) => {
+      const next = { ...prev };
+      dates.forEach((date, index) => {
+        if (!(date in next)) next[date] = index === 0;
+      });
+      return next;
+    });
+  }, [datesKey]);
+
+  const toggleDate = (date) => {
+    setExpandedDates((prev) => ({ ...prev, [date]: !prev[date] }));
+  };
 
   const totalMin = logs.reduce((s, l) => s + (l.duration_min || 0), 0);
   const totalQs = logs.reduce((s, l) => s + (l.questions_attempted || 0), 0);
@@ -234,23 +250,39 @@ export default function Log() {
         </div>
       ) : (
         <div className="space-y-3">
-          {dates.map((d) => (
-            <div key={d} className="card-2 p-3">
-              <div className="text-xs label-x mb-2">{fmtDate(d)}</div>
-              <div className="space-y-1 overflow-x-auto">
-                {byDate[d].map((l) => (
-                  <div key={l.id} className="grid grid-cols-[80px_70px_1fr_80px_60px_40px] items-center gap-2 px-2 py-1.5 rounded row-hover text-sm min-w-[560px]">
-                    <span className="chip">{l.activity}</span>
-                    <span className="chip mono">{l.subject}</span>
-                    <span className="text-[hsl(var(--fg-muted))] truncate" title={l.remarks}>{l.topic || l.remarks || "—"}</span>
-                    <span className="mono text-xs flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDuration(l.duration_min)}</span>
-                    <span className="mono text-xs text-[hsl(var(--fg-muted))]">{l.questions_attempted ? `${l.questions_correct}/${l.questions_attempted}` : "—"}</span>
-                    <button onClick={() => remove(l.id)} className="btn-ghost p-1 text-[hsl(var(--danger))]"><Trash2 className="w-3 h-3" /></button>
+          {dates.map((d) => {
+            const isExpanded = expandedDates[d] ?? true;
+            return (
+              <div key={d} className="card-2 p-3">
+                <button
+                  type="button"
+                  onClick={() => toggleDate(d)}
+                  className="flex w-full items-center justify-between gap-2 rounded-md text-left"
+                  aria-expanded={isExpanded}
+                >
+                  <div className="text-xs label-x">{fmtDate(d)}</div>
+                  <div className="flex items-center gap-2 text-[11px] text-[hsl(var(--fg-muted))]">
+                    <span>{byDate[d].length} entries</span>
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                   </div>
-                ))}
+                </button>
+                {isExpanded && (
+                  <div className="mt-2 space-y-1 overflow-x-auto">
+                    {byDate[d].map((l) => (
+                      <div key={l.id} className="grid grid-cols-[80px_70px_1fr_80px_60px_40px] items-center gap-2 px-2 py-1.5 rounded row-hover text-sm min-w-[560px]">
+                        <span className="chip">{l.activity}</span>
+                        <span className="chip mono">{l.subject}</span>
+                        <span className="text-[hsl(var(--fg-muted))] truncate" title={l.remarks}>{l.topic || l.remarks || "—"}</span>
+                        <span className="mono text-xs flex items-center gap-1"><Clock className="w-3 h-3" />{fmtDuration(l.duration_min)}</span>
+                        <span className="mono text-xs text-[hsl(var(--fg-muted))]">{l.questions_attempted ? `${l.questions_correct}/${l.questions_attempted}` : "—"}</span>
+                        <button type="button" onClick={() => remove(l.id)} className="btn-ghost p-1 text-[hsl(var(--danger))]"><Trash2 className="w-3 h-3" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
