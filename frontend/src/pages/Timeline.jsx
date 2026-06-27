@@ -4,6 +4,8 @@ import { timelineApi, calendarApi, revisitsApi } from "@/lib/api";
 import { TID } from "@/lib/constants";
 import { todayISO, fmtDate, fmtDateLong, fmtDuration, isoAdd, startOfWeek } from "@/lib/dateUtils";
 import TimelineEntryModal from "@/components/TimelineEntryModal";
+import HelpButton from "@/components/HelpButton";
+import { HELP_CONTENT } from "@/lib/helpContent";
 
 const VIEWS = ["daily", "weekly", "monthly"];
 
@@ -85,9 +87,12 @@ export default function Timeline() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold flex items-center gap-2"><CalIcon className="w-5 h-5 text-[hsl(var(--accent))]" /> Timeline</h1>
-          <p className="text-xs text-[hsl(var(--fg-muted))]">Your study calendar & preparation history.</p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h1 className="text-xl font-semibold flex items-center gap-2"><CalIcon className="w-5 h-5 text-[hsl(var(--accent))]" /> Timeline</h1>
+            <p className="text-xs text-[hsl(var(--fg-muted))]">Your study calendar & preparation history.</p>
+          </div>
+          <HelpButton moduleKey="timeline" title={HELP_CONTENT.timeline.title} sections={HELP_CONTENT.timeline.sections} />
         </div>
         <div className="flex items-center gap-2">
           <div className="card-1 p-0.5 flex items-center text-xs">

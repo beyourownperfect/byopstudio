@@ -6,6 +6,8 @@ import { SUBJECTS, TID } from "@/lib/constants";
 import { relLabel } from "@/lib/dateUtils";
 import Latex from "@/components/Latex";
 import RevisitMenu from "@/components/RevisitMenu";
+import HelpButton from "@/components/HelpButton";
+import { HELP_CONTENT } from "@/lib/helpContent";
 
 const MODES = [
   { value: "due", label: "Due revisions" },
@@ -104,7 +106,10 @@ export default function Practice() {
   if (!started) {
     return (
       <div className="max-w-md mx-auto card-2 p-6 space-y-4 mt-12">
-        <h1 className="text-lg font-semibold">Practice</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-lg font-semibold">Practice</h1>
+          <HelpButton moduleKey="practice" title={HELP_CONTENT.practice.title} sections={HELP_CONTENT.practice.sections} />
+        </div>
         <p className="text-xs text-[hsl(var(--fg-muted))]">No planning. Pick a mode. Solve.</p>
         <div>
           <label className="label-x">Mode</label>
@@ -153,7 +158,7 @@ export default function Practice() {
   return (
     <div className="max-w-3xl mx-auto space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="chip chip-accent">{q.subject}</span>
           {q.topic && <span className="chip">{q.topic}</span>}
           <span className="chip">{q.question_type}</span>
@@ -162,6 +167,7 @@ export default function Practice() {
         </div>
         <div className="flex items-center gap-2 text-xs text-[hsl(var(--fg-muted))]">
           <Clock className="w-3 h-3" /> <span className="mono">{Math.floor(elapsed / 60).toString().padStart(2, "0")}:{(elapsed % 60).toString().padStart(2, "0")}</span>
+          <HelpButton moduleKey="practice-active" title={HELP_CONTENT.practice.title} sections={HELP_CONTENT.practice.sections} />
         </div>
       </div>
 

@@ -4,6 +4,8 @@ import { Zap, Target, AlertTriangle, BookOpen, Calendar, ChevronRight, Settings 
 import { pulseApi, settingsApi } from "@/lib/api";
 import { SUBJECTS, SUBJECT_LABELS, TID } from "@/lib/constants";
 import { fmtDateLong } from "@/lib/dateUtils";
+import HelpButton from "@/components/HelpButton";
+import { HELP_CONTENT } from "@/lib/helpContent";
 
 const MOMENTUM_COLORS = (n) => n >= 70 ? "text-[hsl(var(--success))]" : n >= 40 ? "text-[hsl(var(--warning))]" : "text-[hsl(var(--danger))]";
 
@@ -41,9 +43,12 @@ export default function Pulse() {
   return (
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2"><Zap className="w-5 h-5 text-[hsl(var(--accent))]" /> Pulse</h1>
-          <p className="text-xs text-[hsl(var(--fg-muted))]">{fmtDateLong(data.today)}</p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h1 className="text-2xl font-semibold flex items-center gap-2"><Zap className="w-5 h-5 text-[hsl(var(--accent))]" /> Pulse</h1>
+            <p className="text-xs text-[hsl(var(--fg-muted))]">{fmtDateLong(data.today)}</p>
+          </div>
+          <HelpButton moduleKey="pulse" title={HELP_CONTENT.pulse.title} sections={HELP_CONTENT.pulse.sections} />
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">

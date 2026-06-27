@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, Plus, Star, Trash2, Edit3, Play, Upload, Download, ExternalLink, X } from "lucide-react";
+import { Search, Plus, Star, Trash2, Edit3, Play, Upload, Download, ExternalLink, X, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import Papa from "papaparse";
 import { questionsApi, seed } from "@/lib/api";
 import { SUBJECTS, TID } from "@/lib/constants";
 import { debounce, fmtDate, relLabel } from "@/lib/dateUtils";
 import QuestionFormModal from "@/components/QuestionFormModal";
+import QuestionDetailsModal from "@/components/QuestionDetailsModal";
 import RevisitMenu from "@/components/RevisitMenu";
 import Latex from "@/components/Latex";
+import HelpButton from "@/components/HelpButton";
+import { HELP_CONTENT } from "@/lib/helpContent";
 
 const FILTER_MODES = [
   { value: "", label: "All" },
@@ -20,18 +23,28 @@ const FILTER_MODES = [
   { value: "mastered", label: "Mastered" },
 ];
 
+const STORAGE_KEY = "byop.repo.filters.v1";
+const readSaved = () => {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+  catch { return {}; }
+};
+
 export default function Repository() {
   const navigate = useNavigate();
   const [sp, setSp] = useSearchParams();
+  const saved = useMemo(readSaved, []);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [subject, setSubject] = useState(sp.get("subject") || "ALL");
-  const [filterMode, setFilterMode] = useState(sp.get("filter") || "");
+  const [search, setSearch] = useState(saved.search || "");
+  const [subject, setSubject] = useState(sp.get("subject") || saved.subject || "ALL");
+  const [filterMode, setFilterMode] = useState(sp.get("filter") || saved.filterMode || "");
   const [selected, setSelected] = useState(new Set());
   const [editing, setEditing] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [detailsId, setDetailsId] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [undoBuffer, setUndoBuffer] = useState(null); // { items, expiresAt }
+  const [sortBy, setSortBy] = useState(saved.sortBy || { key: "updated_at", dir: "desc" });
 
   const load = async () => {
     setLoading(true);
@@ -48,6 +61,48 @@ export default function Repository() {
 
   const debouncedSearch = useMemo(() => debounce(() => load(), 220), [subject, filterMode]);
   useEffect(() => { debouncedSearch(); return () => debouncedSearch.cancel?.(); /* eslint-disable-next-line */ }, [search]);
+
+  // Persist filters
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ subject, filterMode, search, sortBy }));
+    } catch { /* ignore quota */ }
+  }, [subject, filterMode, search, sortBy]);
+
+  // Client-side sorting layered over backend list
+  const sortedItems = useMemo(() => {
+    const arr = [...items];
+    const { key, dir } = sortBy || {};
+    if (!key) return arr;
+    const mult = dir === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      let av, bv;
+      switch (key) {
+        case "subject": av = a.subject || ""; bv = b.subject || ""; return av.localeCompare(bv) * mult;
+        case "type": av = a.question_type || ""; bv = b.question_type || ""; return av.localeCompare(bv) * mult;
+        case "statement": av = (a.statement || "").toLowerCase(); bv = (b.statement || "").toLowerCase(); return av.localeCompare(bv) * mult;
+        case "mastery": av = a.mastery ?? 0; bv = b.mastery ?? 0; return (av - bv) * mult;
+        case "next_revision_date": av = a.next_revision_date || "9999-12-31"; bv = b.next_revision_date || "9999-12-31"; return av.localeCompare(bv) * mult;
+        case "next_revisit_date": av = a.next_revisit_date || "9999-12-31"; bv = b.next_revisit_date || "9999-12-31"; return av.localeCompare(bv) * mult;
+        default: av = a[key] || ""; bv = b[key] || ""; return String(av).localeCompare(String(bv)) * mult;
+      }
+    });
+    return arr;
+  }, [items, sortBy]);
+
+  const toggleSort = (key) => {
+    setSortBy((prev) => {
+      if (prev?.key === key) return { key, dir: prev.dir === "asc" ? "desc" : "asc" };
+      return { key, dir: "asc" };
+    });
+  };
+  const sortIcon = (key) => {
+    if (sortBy?.key !== key) return <ArrowUpDown className="w-2.5 h-2.5 opacity-50" />;
+    return sortBy.dir === "asc" ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />;
+  };
+
+  const openDetails = (id) => { setDetailsId(id); setDetailsOpen(true); };
+  const closeDetails = () => setDetailsOpen(false);
 
   const onSeed = async () => { await seed(); load(); };
 
@@ -149,9 +204,12 @@ export default function Repository() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">Repository</h1>
-          <p className="text-xs text-[hsl(var(--fg-muted))]">Single source of truth · {items.length} questions</p>
+        <div className="flex items-center gap-2">
+          <div>
+            <h1 className="text-xl font-semibold">Repository</h1>
+            <p className="text-xs text-[hsl(var(--fg-muted))]">Single source of truth · {sortedItems.length} questions</p>
+          </div>
+          <HelpButton moduleKey="repository" title={HELP_CONTENT.repository.title} sections={HELP_CONTENT.repository.sections} />
         </div>
         <div className="flex items-center gap-1.5">
           <label className="btn cursor-pointer" data-testid={TID.repoImportCsv}>
@@ -199,12 +257,12 @@ export default function Repository() {
         <div className="min-w-[760px]">
         <div className="grid grid-cols-[28px_60px_70px_1fr_70px_90px_80px_130px] px-3 py-2 text-[10px] font-semibold tracking-wider uppercase text-[hsl(var(--fg-subtle))] border-b-2 border-border">
           <input type="checkbox" checked={items.length > 0 && selected.size === items.length} onChange={toggleAll} />
-          <span>Subj</span>
-          <span>Type</span>
-          <span>Statement</span>
-          <span className="text-right">Mastery</span>
-          <span className="text-right">Next Rev</span>
-          <span className="text-right">Next Revisit</span>
+          <SortHeader label="Subj" onClick={() => toggleSort("subject")} icon={sortIcon("subject")} />
+          <SortHeader label="Type" onClick={() => toggleSort("type")} icon={sortIcon("type")} />
+          <SortHeader label="Statement" onClick={() => toggleSort("statement")} icon={sortIcon("statement")} />
+          <SortHeader label="Mastery" align="right" onClick={() => toggleSort("mastery")} icon={sortIcon("mastery")} />
+          <SortHeader label="Next Rev" align="right" onClick={() => toggleSort("next_revision_date")} icon={sortIcon("next_revision_date")} />
+          <SortHeader label="Next Revisit" align="right" onClick={() => toggleSort("next_revisit_date")} icon={sortIcon("next_revisit_date")} />
           <span className="text-right pr-1">Actions</span>
         </div>
 
@@ -214,10 +272,10 @@ export default function Repository() {
               {[...Array(8)].map((_, j) => <div key={j} className="skeleton h-4" />)}
             </div>
           ))
-        ) : items.length === 0 ? (
+        ) : sortedItems.length === 0 ? (
           <EmptyRepo onSeed={onSeed} onNew={startNew} />
         ) : (
-          items.map((q) => (
+          sortedItems.map((q) => (
             <RepoRow key={q.id} q={q} selected={selected.has(q.id)}
               onToggle={() => toggleSelect(q.id)}
               onBookmark={() => toggleBookmark(q)}
@@ -225,7 +283,7 @@ export default function Repository() {
               onDelete={() => handleDelete(q.id)}
               onPractice={() => navigate(`/solve/practice?question=${q.id}`)}
               onRevisited={load}
-              onOpenDetails={() => startEdit(q)}
+              onOpenDetails={() => openDetails(q.id)}
             />
           ))
         )}
@@ -243,7 +301,28 @@ export default function Repository() {
       )}
 
       <QuestionFormModal open={formOpen} onClose={() => setFormOpen(false)} editing={editing} onSaved={load} />
+      <QuestionDetailsModal
+        open={detailsOpen}
+        questionId={detailsId}
+        onClose={closeDetails}
+        onEdit={(q) => { closeDetails(); startEdit(q); }}
+        onPractice={(q) => { closeDetails(); navigate(`/solve/practice?question=${q.id}`); }}
+        onBookmarkChanged={load}
+      />
     </div>
+  );
+}
+
+function SortHeader({ label, align, onClick, icon }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 hover:text-[hsl(var(--fg))] transition-colors ${align === "right" ? "justify-end" : ""}`}
+      title={`Sort by ${label}`}
+    >
+      <span>{label}</span> {icon}
+    </button>
   );
 }
 
