@@ -1,0 +1,21 @@
+{
+  "summary": "Re-verified Pulse /pulse mobile horizontal overflow fix. Mobile (390x800): documentElement.scrollWidth = 390 (was 441 in iteration_3, target <=410) -- PASS. No element extends beyond viewport (right>395 returns []). Subject Completion card width 366px, all 12 rows are 322px wide and contained. Desktop (1920x1080) sanity check: all 12 subject rows render with progress bars in the 2-column grid layout, no regression.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Fix in /app/frontend/src/pages/Pulse.jsx lines 167-177 correctly applied: shrink-0 on icons/labels/values, min-w-0 + truncate on subject name label, w-16 sm:w-24 on progress bar. Row is constrained and uses flex-1 truncate properly."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Mobile /pulse overflow regression from iteration_3 is fully resolved (390 scrollWidth on 390 viewport). Desktop layout preserved with all 12 subjects and progress bars visible.",
+  "rca of the issue": "Root cause from iteration_3: Subject Completion row used fixed widths without shrink-0/min-w-0 constraints, causing total inner width to exceed 390px on mobile. Fix correctly applies shrink-0 to fixed-width children (subject code w-10, count w-12 sm:w-14, percent w-9, progress bar w-16 sm:w-24) and min-w-0 + truncate + flex-1 on the subject name span so it absorbs available space without forcing overflow."
+}
