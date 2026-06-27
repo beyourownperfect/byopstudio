@@ -163,16 +163,16 @@ export default function Pulse() {
           <BookOpen className="w-4 h-4 text-[hsl(var(--info))]" />
           <h3 className="font-semibold">Subject Completion</h3>
         </div>
-        <div className="grid md:grid-cols-2 gap-x-6 gap-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
           {data.subject_completion.map((s) => (
-            <div key={s.subject} className="flex items-center gap-3">
-              <span className="w-10 mono text-xs">{s.subject}</span>
-              <span className="text-xs text-[hsl(var(--fg-muted))] flex-1 truncate">{SUBJECT_LABELS[s.subject]}</span>
-              <span className="text-xs mono text-[hsl(var(--fg-muted))] w-14 text-right">{s.completed}/{s.total}</span>
-              <div className="w-24 h-1.5 bg-[hsl(var(--bg-elev-2))] rounded overflow-hidden">
+            <div key={s.subject} className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <span className="w-10 mono text-xs shrink-0">{s.subject}</span>
+              <span className="text-xs text-[hsl(var(--fg-muted))] flex-1 truncate min-w-0">{SUBJECT_LABELS[s.subject]}</span>
+              <span className="text-xs mono text-[hsl(var(--fg-muted))] w-12 sm:w-14 text-right shrink-0">{s.completed}/{s.total}</span>
+              <div className="w-16 sm:w-24 h-1.5 bg-[hsl(var(--bg-elev-2))] rounded overflow-hidden shrink-0">
                 <div className="h-full bg-[hsl(var(--accent))]" style={{ width: `${s.percent}%` }} />
               </div>
-              <span className="mono text-xs w-9 text-right">{s.percent}%</span>
+              <span className="mono text-xs w-9 text-right shrink-0">{s.percent}%</span>
             </div>
           ))}
         </div>
