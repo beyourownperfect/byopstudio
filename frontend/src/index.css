@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import 'katex/dist/katex.min.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: 0 0% 7%;
+    --bg-elev: 0 0% 9%;
+    --bg-elev-2: 0 0% 11%;
+    --fg: 0 0% 96%;
+    --fg-muted: 0 0% 60%;
+    --fg-subtle: 0 0% 42%;
+    --border: 0 0% 16%;
+    --border-strong: 0 0% 22%;
+    --accent: 217 91% 60%;
+    --accent-fg: 0 0% 100%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --danger: 0 84% 60%;
+    --info: 199 89% 48%;
+
+    --background: var(--bg);
+    --foreground: var(--fg);
+    --card: var(--bg-elev);
+    --card-foreground: var(--fg);
+    --popover: var(--bg-elev-2);
+    --popover-foreground: var(--fg);
+    --primary: var(--accent);
+    --primary-foreground: var(--accent-fg);
+    --secondary: var(--bg-elev-2);
+    --secondary-foreground: var(--fg);
+    --muted: var(--bg-elev);
+    --muted-foreground: var(--fg-muted);
+    --destructive: var(--danger);
+    --destructive-foreground: 0 0% 100%;
+    --input: var(--border);
+    --ring: var(--accent);
+    --radius: 0.5rem;
+  }
+
+  * { @apply border-border; }
+
+  html, body, #root {
+    background: hsl(var(--bg));
+    color: hsl(var(--fg));
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv02','cv03','cv04','cv11';
+    color-scheme: dark;
+  }
+
+  body { @apply min-h-screen; }
+
+  ::selection { background: hsl(var(--accent) / 0.35); }
+  *:focus-visible {
+    outline: 2px solid hsl(var(--accent));
+    outline-offset: 1px;
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: hsl(var(--bg)); }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--border-strong)); border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--fg-subtle)); }
+
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+}
+
+@layer components {
+  .card-2 {
+    @apply bg-[hsl(var(--bg-elev))] rounded-lg;
+    border: 2px solid hsl(var(--border));
+  }
+  .card-1 {
+    @apply bg-[hsl(var(--bg-elev))] rounded-lg border border-[hsl(var(--border))];
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg-muted))];
+  }
+  .chip-accent { @apply text-[hsl(var(--accent))] border-[hsl(var(--accent))]/40 bg-[hsl(var(--accent))]/10; }
+  .chip-success { @apply text-[hsl(var(--success))] border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/10; }
+  .chip-warning { @apply text-[hsl(var(--warning))] border-[hsl(var(--warning))]/40 bg-[hsl(var(--warning))]/10; }
+  .chip-danger { @apply text-[hsl(var(--danger))] border-[hsl(var(--danger))]/40 bg-[hsl(var(--danger))]/10; }
+
+  .btn { @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-elev))] hover:bg-[hsl(var(--bg-elev-2))] active:scale-[0.97] transition-all duration-150; }
+  .btn-primary { @apply bg-[hsl(var(--accent))] text-white border-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/90; }
+  .btn-ghost { @apply bg-transparent border-transparent hover:bg-[hsl(var(--bg-elev-2))]; }
+  .btn-danger { @apply bg-transparent text-[hsl(var(--danger))] border-[hsl(var(--danger))]/40 hover:bg-[hsl(var(--danger))]/10; }
+
+  .input {
+    @apply w-full px-3 py-2 text-sm rounded-md bg-[hsl(var(--bg))] border border-[hsl(var(--border))] focus:border-[hsl(var(--accent))] focus:outline-none transition-colors;
+  }
+  textarea.input { @apply min-h-[80px] resize-y; }
+  select.input { @apply pr-8; }
+  .label-x { @apply text-[10px] font-semibold tracking-[0.16em] uppercase text-[hsl(var(--fg-subtle))]; }
+
+  .skeleton { @apply bg-[hsl(var(--bg-elev-2))] animate-pulse rounded; }
+
+  .row-hover { @apply hover:bg-[hsl(var(--bg-elev-2))] transition-colors; }
+
+  /* katex */
+  .katex { font-size: 1em !important; }
+  .katex-display { margin: 0.5em 0 !important; }
+}
+
+@layer base {
+  [data-debug-wrapper="true"] { display: contents !important; }
+  [data-debug-wrapper="true"] > * {
+    margin: inherit; padding: inherit; column-gap: inherit; row-gap: inherit; gap: inherit;
+    border-width: inherit; border-style: inherit; border-color: inherit;
+  }
+}
