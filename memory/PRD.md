@@ -16,6 +16,15 @@ Single-user GATE CSE preparation operating system, cloned from `beyourownperfect
 
 ## Implementation history
 
+### 2026-06-27 — Product audit, Help system & PROJECT_CONTEXT (v1.1.1)
+- **Question Details Modal** (`QuestionDetailsModal.jsx`) on dbl-click in Repository: LaTeX statement/options/explanation, mastery progress bar, attempts/correct/streak/next-review stat cards, attempts history, GateOverflow link, Edit & Practice buttons.
+- **Repository sorting** — clickable column headers for Subj/Type/Statement/Mastery/Next-Rev/Next-Revisit (asc/desc toggle).
+- **Remembered filters & sort** — persisted in `localStorage` (`byop.repo.filters.v1`), restored on reload.
+- **Log stopwatch** — large live display with Start/Pause/Reset, Space/R/N keyboard shortcuts, Subject/Activity/Topic + Journal note → Save to log.
+- **Session summary** — 4-card grid (Total time, Sessions, Questions, Accuracy).
+- **Contextual help (?)** buttons on Repository, Practice, Pulse, Log, Timeline. Content in `lib/helpContent.js` (~20–30s read each).
+- **`/app/PROJECT_CONTEXT.md`** — full project context (philosophy, stack, schema, workflows, algorithms, conventions, design, pending) sufficient for any future AI session.
+
 ### 2026-06-27 — Initial preview
 - Cloned repo into `/app`, installed deps, seeded 8 sample questions.
 
