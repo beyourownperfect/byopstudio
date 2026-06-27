@@ -195,6 +195,8 @@ export default function Repository() {
 
       {/* List */}
       <div className="card-2 overflow-hidden">
+        <div className="overflow-x-auto">
+        <div className="min-w-[760px]">
         <div className="grid grid-cols-[28px_60px_70px_1fr_70px_90px_80px_130px] px-3 py-2 text-[10px] font-semibold tracking-wider uppercase text-[hsl(var(--fg-subtle))] border-b-2 border-border">
           <input type="checkbox" checked={items.length > 0 && selected.size === items.length} onChange={toggleAll} />
           <span>Subj</span>
@@ -223,9 +225,12 @@ export default function Repository() {
               onDelete={() => handleDelete(q.id)}
               onPractice={() => navigate(`/solve/practice?question=${q.id}`)}
               onRevisited={load}
+              onOpenDetails={() => startEdit(q)}
             />
           ))
         )}
+        </div>
+        </div>
       </div>
 
       {/* Undo toast */}
@@ -242,13 +247,20 @@ export default function Repository() {
   );
 }
 
-function RepoRow({ q, selected, onToggle, onBookmark, onEdit, onDelete, onPractice, onRevisited }) {
+function RepoRow({ q, selected, onToggle, onBookmark, onEdit, onDelete, onPractice, onRevisited, onOpenDetails }) {
   const mastery = q.mastery ?? 0;
   const masteryColor = mastery >= 80 ? "chip-success" : mastery >= 40 ? "chip-warning" : "chip-danger";
+  // Prevent double-click selecting text in the row.
+  const handleDoubleClick = (e) => {
+    if (e.target.closest("button, a, input, [data-no-dbl]")) return;
+    if (window.getSelection) window.getSelection().removeAllRanges();
+    onOpenDetails?.();
+  };
   return (
     <div data-testid={TID.repoRow(q.id)}
-      className="grid grid-cols-[28px_60px_70px_1fr_70px_90px_80px_130px] gap-2 items-center px-3 py-2.5 border-b border-border row-hover text-sm">
-      <input data-testid={TID.repoRowCheckbox(q.id)} type="checkbox" checked={selected} onChange={onToggle} />
+      onDoubleClick={handleDoubleClick}
+      className="grid grid-cols-[28px_60px_70px_1fr_70px_90px_80px_130px] gap-2 items-center px-3 py-2.5 border-b border-border row-hover text-sm cursor-default select-none">
+      <input data-testid={TID.repoRowCheckbox(q.id)} type="checkbox" checked={selected} onChange={onToggle} data-no-dbl />
       <span className="chip">{q.subject}</span>
       <span className="text-xs text-[hsl(var(--fg-muted))] mono">{q.question_type}</span>
       <div className="min-w-0 truncate" title={q.statement}>

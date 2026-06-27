@@ -587,10 +587,30 @@ async def list_timeline(start: Optional[str] = None, end: Optional[str] = None, 
         query["date"] = rng
     docs = await db.timeline.find(query, {"_id": 0}).sort("date", -1).to_list(limit)
 
+    # Also include entries whose scheduled_revisions intersect the range
+    # (so revisions scheduled in this range show up even if parent entry was outside).
+    parent_for_scheduling: List[dict] = []
+    if start or end:
+        sched_query: Dict[str, Any] = {"scheduled_revisions": {"$exists": True, "$ne": []}}
+        if start and end:
+            sched_query["scheduled_revisions"] = {"$elemMatch": {"$gte": start, "$lte": end}}
+        elif start:
+            sched_query["scheduled_revisions"] = {"$elemMatch": {"$gte": start}}
+        elif end:
+            sched_query["scheduled_revisions"] = {"$elemMatch": {"$lte": end}}
+        existing_ids = {e["id"] for e in docs}
+        extra = await db.timeline.find(sched_query, {"_id": 0}).to_list(limit)
+        for e in extra:
+            if e["id"] not in existing_ids:
+                parent_for_scheduling.append(e)
+
     # also project scheduled revisions as virtual timeline items
     scheduled = []
-    for e in docs:
+    all_parents = docs + parent_for_scheduling
+    for e in all_parents:
         for rd in e.get("scheduled_revisions", []):
+            if start and rd < start: continue
+            if end and rd > end: continue
             if rd not in e.get("completed_revisions", []):
                 scheduled.append({
                     "id": f"rev-{e['id']}-{rd}",
@@ -789,8 +809,19 @@ async def pulse():
     today = today_iso()
     settings = await _get_settings()
 
-    # Due revisions
+    # Due revisions (SRS) + due timeline-scheduled revisions
     due_srs = await db.srs.count_documents({"next_review_date": {"$lte": today}})
+    # Timeline scheduled revisions whose date <= today and not yet completed
+    timeline_with_sched = await db.timeline.find(
+        {"scheduled_revisions": {"$exists": True, "$ne": []}}, {"_id": 0}
+    ).to_list(5000)
+    due_timeline_revs = 0
+    for tle in timeline_with_sched:
+        completed = set(tle.get("completed_revisions", []))
+        for rd in tle.get("scheduled_revisions", []):
+            if rd <= today and rd not in completed:
+                due_timeline_revs += 1
+    due_revisions_total = due_srs + due_timeline_revs
     # Due revisits
     due_revisits = await db.revisits.count_documents({"completed": False, "revisit_date": {"$lte": today}})
 
@@ -860,8 +891,8 @@ async def pulse():
 
     # Today's Mission (max 4) — prioritized: due revisions, due revisits, weak topics, new practice
     mission = []
-    if due_srs > 0:
-        mission.append({"id": "due-rev", "title": f"Complete {min(due_srs, settings['daily_revision_target'])} due revisions", "count": due_srs, "kind": "due_revisions"})
+    if due_revisions_total > 0:
+        mission.append({"id": "due-rev", "title": f"Complete {min(due_revisions_total, settings['daily_revision_target'])} due revisions", "count": due_revisions_total, "kind": "due_revisions"})
     if due_revisits > 0:
         mission.append({"id": "due-revisit", "title": f"Tackle {due_revisits} revisit items", "count": due_revisits, "kind": "due_revisits"})
     if weak_topics:
@@ -887,7 +918,9 @@ async def pulse():
         "today": today,
         "mission": mission,
         "momentum": momentum,
-        "due_revisions": due_srs,
+        "due_revisions": due_revisions_total,
+        "due_srs": due_srs,
+        "due_timeline_revisions": due_timeline_revs,
         "due_revisits": due_revisits,
         "weak_topics": weak_topics,
         "subject_completion": subject_completion,

@@ -70,7 +70,7 @@ export default function Log() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <SumCard label="Total time" value={fmtDuration(totalMin)} />
         <SumCard label="Questions" value={totalQs} />
         <SumCard label="Accuracy" value={totalQs ? `${Math.round(totalCorrect / totalQs * 100)}%` : "—"} />
@@ -86,9 +86,9 @@ export default function Log() {
           {dates.map((d) => (
             <div key={d} className="card-2 p-3">
               <div className="text-xs label-x mb-2">{fmtDate(d)}</div>
-              <div className="space-y-1">
+              <div className="space-y-1 overflow-x-auto">
                 {byDate[d].map((l) => (
-                  <div key={l.id} className="grid grid-cols-[80px_70px_1fr_80px_60px_40px] items-center gap-2 px-2 py-1.5 rounded row-hover text-sm">
+                  <div key={l.id} className="grid grid-cols-[80px_70px_1fr_80px_60px_40px] items-center gap-2 px-2 py-1.5 rounded row-hover text-sm min-w-[560px]">
                     <span className="chip">{l.activity}</span>
                     <span className="chip mono">{l.subject}</span>
                     <span className="text-[hsl(var(--fg-muted))] truncate">{l.topic || l.remarks || "—"}</span>

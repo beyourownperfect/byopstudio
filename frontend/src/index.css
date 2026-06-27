@@ -101,6 +101,9 @@
 
   .row-hover { @apply hover:bg-[hsl(var(--bg-elev-2))] transition-colors; }
 
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+
   /* katex */
   .katex { font-size: 1em !important; }
   .katex-display { margin: 0.5em 0 !important; }

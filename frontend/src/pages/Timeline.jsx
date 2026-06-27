@@ -187,7 +187,8 @@ function Legend({ color, label }) {
 function WeeklyView({ rangeStart, dayMap, calMap, openEntry }) {
   const days = [...Array(7)].map((_, i) => isoAdd(rangeStart, i));
   return (
-    <div className="grid grid-cols-7 gap-3">
+    <div className="overflow-x-auto -mx-3 sm:mx-0">
+    <div className="grid grid-cols-7 gap-2 sm:gap-3 min-w-[840px] px-3 sm:px-0">
       {days.map((d) => {
         const data = dayMap[d];
         const c = calMap[d];
@@ -220,6 +221,7 @@ function WeeklyView({ rangeStart, dayMap, calMap, openEntry }) {
           </div>
         );
       })}
+    </div>
     </div>
   );
 }

@@ -75,7 +75,7 @@ export default function TimelineEntryModal({ open, onClose, entry, onSaved }) {
       }
     >
       <div className="space-y-3">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div><label className="label-x">Date</label><input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} className="input mt-1" /></div>
           <div><label className="label-x">Subject</label>
             <select value={form.subject} onChange={(e) => set("subject", e.target.value)} className="input mt-1">
@@ -92,7 +92,7 @@ export default function TimelineEntryModal({ open, onClose, entry, onSaved }) {
           <label className="label-x">Title</label>
           <input value={form.title} onChange={(e) => set("title", e.target.value)} className="input mt-1" placeholder="e.g. Process Synchronization — Lecture 1 Complete" />
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div><label className="label-x">Topic</label><input value={form.topic} onChange={(e) => set("topic", e.target.value)} className="input mt-1" /></div>
           <div><label className="label-x">Duration (min)</label><input type="number" value={form.duration_min} onChange={(e) => set("duration_min", e.target.value)} className="input mt-1" /></div>
           <div><label className="label-x">Questions solved</label><input type="number" value={form.questions_solved} onChange={(e) => set("questions_solved", e.target.value)} className="input mt-1" /></div>
