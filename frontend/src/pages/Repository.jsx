@@ -57,10 +57,10 @@ export default function Repository() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [subject, filterMode]);
+  useEffect(() => { load(); }, [subject, filterMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const debouncedSearch = useMemo(() => debounce(() => load(), 220), [subject, filterMode]);
-  useEffect(() => { debouncedSearch(); return () => debouncedSearch.cancel?.(); /* eslint-disable-next-line */ }, [search]);
+  const debouncedSearch = useMemo(() => debounce(() => load(), 220), [subject, filterMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { debouncedSearch(); return () => debouncedSearch.cancel?.(); }, [search, debouncedSearch]);
 
   // Persist filters
   useEffect(() => {
@@ -198,8 +198,7 @@ export default function Repository() {
     if (subject !== "ALL") params.subject = subject;
     if (filterMode) params.filter = filterMode;
     setSp(params, { replace: true });
-    // eslint-disable-next-line
-  }, [subject, filterMode]);
+  }, [subject, filterMode, setSp]);
 
   return (
     <div className="space-y-4">

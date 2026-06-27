@@ -74,7 +74,10 @@ A single-user web app that replaces a study planner with a closed-loop habit eng
 │       │   └── utils.js
 │       └── constants/testIds/   # legacy test-id constants
 ├── memory/PRD.md
-└── PROJECT_CONTEXT.md           # ← this file
+├── PROJECT_CONTEXT.md           # ← this file
+├── README.md
+├── HOW_TO_CODE_THIS_PROJECT.txt
+└── .gitignore
 ```
 
 ---
@@ -339,11 +342,11 @@ score  = min(100, score)
 
 ## 11. Current version
 
-- Tag: **v1.1** (displayed in header).
+- Tag: **v1.0** (frozen). Header still displays "v1.1" (build tag — leave as-is unless re-released).
 - Backend `/api/` returns `{"app": "BYOPGateCS.studio", "status": "ok"}`.
 - Vercel-ready frontend (`frontend/vercel.json`); backend needs a separate long-running host.
 
-### What's in v1.1
+### v1.0 — frozen state (open-source baseline)
 - Question Details Modal (LaTeX, attempts, mastery, revision status, GateOverflow).
 - Repository column sorting + remembered filters/sort.
 - Double-click row → Details Modal.
@@ -352,6 +355,7 @@ score  = min(100, score)
 - Timeline-scheduled revisions correctly counted in Pulse + Mission.
 - Contextual `?` help on Repository, Practice, Pulse, Log, Timeline.
 - Full mobile responsiveness (hamburger, bottom-sheet modals, no horizontal overflow).
+- Final cleanup pass: zero lint warnings, dead files removed, `.env.example` for both services, comprehensive `.gitignore`, full `README.md`, `HOW_TO_CODE_THIS_PROJECT.txt`.
 
 ---
 
@@ -403,4 +407,8 @@ Env vars:        REACT_APP_BACKEND_URL=<your-backend-https-url>
 
 ---
 
-*Last updated: 2026-06-27 (v1.1 audit + help system + project context doc).*
+- `.env.example` files are committed in both `backend/` and `frontend/`.
+- Backend env: `MONGO_URL`, `DB_NAME`, `CORS_ORIGINS`.
+- Frontend env: `REACT_APP_BACKEND_URL` (and optionally `WDS_SOCKET_PORT`).
+
+*Last updated: 2026-06-27 (v1.0 — frozen open-source baseline).*

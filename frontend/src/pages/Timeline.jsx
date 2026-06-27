@@ -44,7 +44,7 @@ export default function Timeline() {
     setRevisits(r.items || []);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [rangeStart, rangeEnd]);
+  useEffect(() => { load(); }, [rangeStart, rangeEnd]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refresh = async () => {
     load();

@@ -26,7 +26,7 @@ export default function Mistakes() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [mode]);
+  useEffect(() => { load(); }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const practiceAll = () => {
     if (items.length === 0) return;
@@ -53,7 +53,7 @@ export default function Mistakes() {
       ) : items.length === 0 ? (
         <div className="card-2 p-12 text-center">
           <p className="font-semibold mb-1">No mistakes here.</p>
-          <p className="text-xs text-[hsl(var(--fg-muted))]">Either nothing wrong yet, or you're crushing it.</p>
+          <p className="text-xs text-[hsl(var(--fg-muted))]">Either nothing wrong yet, or you&apos;re crushing it.</p>
         </div>
       ) : (
         <div className="card-2 divide-y divide-border">

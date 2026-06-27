@@ -69,7 +69,7 @@ export default function Log() {
     setLogs(res.items || []);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [view]);
+  useEffect(() => { load(); }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -86,8 +86,7 @@ export default function Log() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line
-  }, [sw.running]);
+  }, [sw]); // sw is stable hook return; depends are tracked via sw methods
 
   const submit = async () => {
     await logsApi.create({ ...form, duration_min: Number(form.duration_min) });

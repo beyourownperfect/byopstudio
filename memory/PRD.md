@@ -16,6 +16,18 @@ Single-user GATE CSE preparation operating system, cloned from `beyourownperfect
 
 ## Implementation history
 
+### 2026-06-27 — v1.0 freeze (final engineering pass)
+- **Code cleanup**: removed dead files (`/app/yarn.lock`, `/app/tests/`, `frontend/src/constants/testIds/`), unused imports (`Query`), `import random` moved to top.
+- **Backend lint**: zero issues — removed all multi-statement lines (E701), renamed ambiguous `l` → `log_entry`, fixed potential ObjectId-leak in `_get_settings()`.
+- **Frontend lint**: zero issues in app code — removed unused `eslint-disable` directives across pages, escaped HTML entities in user-facing strings.
+- **Comments added** for non-obvious algorithm logic: `_compute_mastery`, `_momentum_score`, SRS update rule in `/practice/submit`, weakness engine in `/pulse`, scheduled-revision projection in `/timeline`.
+- **`.gitignore` hardened**: added `.env`, `.env.*` (except `.env.example`), `__pycache__/`, `.pytest_cache/`, `test_reports/`.
+- **`.env.example`** added in both `backend/` and `frontend/` with full inline documentation.
+- **`README.md`** rewritten — overview, features, tech stack, local setup, env vars, MongoDB setup, run instructions, full Vercel + Render deployment guide, folder structure, roadmap.
+- **`HOW_TO_CODE_THIS_PROJECT.txt`** added at repo root — phase-by-phase build path, prerequisites, common pitfalls, recommended resources, maintenance philosophy.
+- **`PROJECT_CONTEXT.md`** updated to v1.0 frozen state.
+- Backend tests: **29/29 pass**; frontend production build: **clean (no warnings)**; zero console errors across all 5 pages.
+
 ### 2026-06-27 — Product audit, Help system & PROJECT_CONTEXT (v1.1.1)
 - **Question Details Modal** (`QuestionDetailsModal.jsx`) on dbl-click in Repository: LaTeX statement/options/explanation, mastery progress bar, attempts/correct/streak/next-review stat cards, attempts history, GateOverflow link, Edit & Practice buttons.
 - **Repository sorting** — clickable column headers for Subj/Type/Statement/Mastery/Next-Rev/Next-Revisit (asc/desc toggle).

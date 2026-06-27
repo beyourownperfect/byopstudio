@@ -64,7 +64,7 @@ export default function Pulse() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Target className="w-4 h-4 text-[hsl(var(--accent))]" />
-            <h2 className="font-semibold">Today's Mission</h2>
+            <h2 className="font-semibold">Today&apos;s Mission</h2>
           </div>
           <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--fg-subtle))]">Top {data.mission.length}</span>
         </div>
@@ -115,7 +115,7 @@ export default function Pulse() {
         </div>
 
         <div className="card-2 p-5">
-          <div className="label-x mb-1">Today's progress</div>
+          <div className="label-x mb-1">Today&apos;s progress</div>
           <div className="space-y-2 mt-1">
             <ProgressLine label="Questions" value={data.today_questions} target={data.targets.daily_question_target} pct={data.daily_q_percent} />
             <ProgressLine label="Minutes" value={data.today_minutes} target={data.targets.daily_study_minutes_target} pct={data.daily_m_percent} />

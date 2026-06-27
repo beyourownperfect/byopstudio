@@ -60,8 +60,7 @@ export default function Practice() {
     if (qid) {
       questionsApi.get(qid).then((data) => { setQ(data); setStarted(true); });
     }
-    // eslint-disable-next-line
-  }, []);
+  }, [sp]);
 
   const start = async () => { setStarted(true); await fetchNext(); };
 

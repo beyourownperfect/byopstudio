@@ -2,11 +2,12 @@
 BYOPGateCS.studio — GATE CSE Study Operating System
 Single-user backend. MongoDB. FastAPI.
 """
-from fastapi import FastAPI, APIRouter, HTTPException, Query
+from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import random
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -183,7 +184,9 @@ async def _ensure_srs(question_id: str) -> dict:
 
 
 def _compute_mastery(srs: dict) -> int:
-    """Mastery 0-100 derived from interval + accuracy."""
+    """Mastery score 0-100. Blends current SRS interval reached (60% weight)
+    with lifetime accuracy (40% weight). A perfect run through all 6 intervals
+    with 100% accuracy => 100. Zero attempts => 0."""
     if not srs or srs.get("total_attempts", 0) == 0:
         return 0
     acc = srs["correct_attempts"] / srs["total_attempts"]
@@ -193,9 +196,11 @@ def _compute_mastery(srs: dict) -> int:
 
 async def _get_settings() -> dict:
     s = await db.settings.find_one({"id": "singleton"}, {"_id": 0})
-    if not s:
-        s = Settings().model_dump()
-        await db.settings.insert_one(s)
+    if s:
+        return s
+    s = Settings().model_dump()
+    # insert_one mutates `s` by adding _id; insert a copy and return the clean dict
+    await db.settings.insert_one(dict(s))
     return s
 
 
@@ -431,7 +436,6 @@ async def next_question(
     if not candidates:
         return None
 
-    import random
     picked = random.choice(candidates)
     srs = await _ensure_srs(picked["id"])
     picked["srs"] = srs
@@ -456,6 +460,10 @@ async def submit_practice(payload: Dict[str, Any]):
     await db.attempts.insert_one(attempt.model_dump())
 
     srs = await _ensure_srs(qid)
+    # SRS update rule:
+    #   correct  -> advance one interval (capped at last), streak += 1
+    #   wrong    -> reset to first interval (1 day), streak = 0
+    # next_review_date = today + SRS_INTERVALS[new_idx]
     if correct:
         new_idx = min(srs["interval_idx"] + 1, len(SRS_INTERVALS) - 1)
         cc = srs.get("consecutive_correct", 0) + 1
@@ -543,8 +551,10 @@ async def list_logs(start: Optional[str] = None, end: Optional[str] = None, limi
     query: Dict[str, Any] = {}
     if start or end:
         rng = {}
-        if start: rng["$gte"] = start
-        if end:   rng["$lte"] = end
+        if start:
+            rng["$gte"] = start
+        if end:
+            rng["$lte"] = end
         query["date"] = rng
     docs = await db.study_logs.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
     return {"items": docs, "total": len(docs)}
@@ -582,8 +592,10 @@ async def list_timeline(start: Optional[str] = None, end: Optional[str] = None, 
     query: Dict[str, Any] = {}
     if start or end:
         rng = {}
-        if start: rng["$gte"] = start
-        if end:   rng["$lte"] = end
+        if start:
+            rng["$gte"] = start
+        if end:
+            rng["$lte"] = end
         query["date"] = rng
     docs = await db.timeline.find(query, {"_id": 0}).sort("date", -1).to_list(limit)
 
@@ -604,13 +616,16 @@ async def list_timeline(start: Optional[str] = None, end: Optional[str] = None, 
             if e["id"] not in existing_ids:
                 parent_for_scheduling.append(e)
 
-    # also project scheduled revisions as virtual timeline items
+    # Project scheduled revisions as virtual timeline items so the frontend can render them
+    # on their target date even though they are stored on the parent entry.
     scheduled = []
     all_parents = docs + parent_for_scheduling
     for e in all_parents:
         for rd in e.get("scheduled_revisions", []):
-            if start and rd < start: continue
-            if end and rd > end: continue
+            if start and rd < start:
+                continue
+            if end and rd > end:
+                continue
             if rd not in e.get("completed_revisions", []):
                 scheduled.append({
                     "id": f"rev-{e['id']}-{rd}",
@@ -721,8 +736,10 @@ async def list_revisits(
         query["revisit_date"] = {"$lte": today_iso()}
     elif start or end:
         rng = {}
-        if start: rng["$gte"] = start
-        if end:   rng["$lte"] = end
+        if start:
+            rng["$gte"] = start
+        if end:
+            rng["$lte"] = end
         query["revisit_date"] = rng
     docs = await db.revisits.find(query, {"_id": 0}).sort("revisit_date", 1).to_list(2000)
     return {"items": docs, "total": len(docs)}
@@ -755,10 +772,10 @@ async def _aggregate_day(d_iso: str) -> dict:
     revisits_pending = await db.revisits.count_documents({"completed": False, "revisit_date": d_iso})
     timeline_count = await db.timeline.count_documents({"date": d_iso})
     scheduled_today = 0
-    async for e in db.timeline.find({"scheduled_revisions": d_iso}, {"_id": 0}):
+    async for _e in db.timeline.find({"scheduled_revisions": d_iso}, {"_id": 0}):
         scheduled_today += 1
-    total_minutes = sum(l.get("duration_min", 0) for l in logs)
-    qs_solved = sum(l.get("questions_attempted", 0) for l in logs)
+    total_minutes = sum(log.get("duration_min", 0) for log in logs)
+    qs_solved = sum(log.get("questions_attempted", 0) for log in logs)
     return {
         "date": d_iso,
         "study_minutes": total_minutes,
@@ -784,23 +801,30 @@ async def calendar(start: str, end: str):
 
 
 async def _momentum_score() -> int:
-    """0-100. Reward consistency + diversity + revision completion."""
+    """Momentum 0-100 over last 7 days. Rewards five things, capped:
+        - daily consistency  (active days * 5,   cap 35)
+        - subject diversity  (subjects * 3,      cap 20)
+        - solve volume       (questions // 5,    cap 20)
+        - hours invested     (minutes // 30,     cap 15)
+        - revision habit     (revisions * 2,     cap 10)
+    Intentional: rewards habit over heroics — one big day cannot maximise the score."""
     today = date.today()
     last7 = [(today - timedelta(days=i)).isoformat() for i in range(7)]
     logs = await db.study_logs.find({"date": {"$in": last7}}, {"_id": 0}).to_list(5000)
     if not logs:
         return 0
-    active_days = len(set(l["date"] for l in logs))
-    subjects_touched = len(set(l["subject"] for l in logs))
-    qs = sum(l.get("questions_attempted", 0) for l in logs)
-    mins = sum(l.get("duration_min", 0) for l in logs)
-    revisions_done = sum(1 for l in logs if l.get("activity") == "Revision")
-    score = 0
-    score += min(35, active_days * 5)            # up to 35 for daily active
-    score += min(20, subjects_touched * 3)        # up to 20 for diversity
-    score += min(20, qs // 5)                     # up to 20 for solved volume
-    score += min(15, mins // 30)                  # up to 15 for hours
-    score += min(10, revisions_done * 2)          # up to 10 for revisions
+    active_days = len({log["date"] for log in logs})
+    subjects_touched = len({log["subject"] for log in logs})
+    qs = sum(log.get("questions_attempted", 0) for log in logs)
+    mins = sum(log.get("duration_min", 0) for log in logs)
+    revisions_done = sum(1 for log in logs if log.get("activity") == "Revision")
+    score = (
+        min(35, active_days * 5)
+        + min(20, subjects_touched * 3)
+        + min(20, qs // 5)
+        + min(15, mins // 30)
+        + min(10, revisions_done * 2)
+    )
     return min(100, score)
 
 
@@ -827,10 +851,12 @@ async def pulse():
 
     # Today's logs
     today_logs = await db.study_logs.find({"date": today}, {"_id": 0}).to_list(1000)
-    today_qs = sum(l.get("questions_attempted", 0) for l in today_logs)
-    today_minutes = sum(l.get("duration_min", 0) for l in today_logs)
+    today_qs = sum(log.get("questions_attempted", 0) for log in today_logs)
+    today_minutes = sum(log.get("duration_min", 0) for log in today_logs)
 
-    # Weak topics: aggregate accuracy per subject+topic for last 30d
+    # ----- Weakness Engine -----
+    # Group last-30-day attempts by (subject, topic). A bucket is "weak" if it has
+    # at least 3 attempts AND accuracy < 70%. Top 3 weakest are surfaced.
     cutoff = (date.today() - timedelta(days=30)).isoformat()
     recent_attempts = await db.attempts.find({"created_at": {"$gte": cutoff}}, {"_id": 0}).to_list(50000)
     if recent_attempts:
@@ -840,13 +866,14 @@ async def pulse():
         agg: Dict[str, Dict[str, Any]] = {}
         for a in recent_attempts:
             q = qmap.get(a["question_id"])
-            if not q: continue
+            if not q:
+                continue
             key = f"{q['subject']}::{q.get('topic','') or 'General'}"
             d = agg.setdefault(key, {"subject": q["subject"], "topic": q.get("topic", "") or "General", "total": 0, "correct": 0})
             d["total"] += 1
             d["correct"] += 1 if a["correct"] else 0
         weak_topics = []
-        for k, d in agg.items():
+        for _k, d in agg.items():
             if d["total"] >= 3:
                 acc = d["correct"] / d["total"]
                 if acc < 0.7:
