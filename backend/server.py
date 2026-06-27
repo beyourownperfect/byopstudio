@@ -173,6 +173,18 @@ class Settings(BaseModel):
     updated_at: str = Field(default_factory=now_iso)
 
 
+class UserMission(BaseModel):
+    """User-authored mission task (separate from system-computed recommendations)."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    notes: str = ""
+    order: int = 0
+    completed: bool = False
+    completed_at: Optional[str] = None
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+
+
 # ============================ HELPERS ==============================
 async def _ensure_srs(question_id: str) -> dict:
     rec = await db.srs.find_one({"question_id": question_id}, {"_id": 0})
@@ -192,6 +204,16 @@ def _compute_mastery(srs: dict) -> int:
     acc = srs["correct_attempts"] / srs["total_attempts"]
     interval_pct = (srs.get("interval_idx", 0) / (len(SRS_INTERVALS) - 1)) * 100
     return int(min(100, 0.6 * interval_pct + 40 * acc))
+
+
+def _is_question_completed(srs: dict) -> bool:
+    """A question is "completed" only after 1 correct solve + 2 successful SRS revisions.
+    That requires advancing through 3 SRS intervals (idx 0 -> 1 -> 2 -> 3),
+    which can only happen via 3 correct answers in a row from the start
+    (or after a reset). interval_idx >= 3 AND correct_attempts >= 3."""
+    if not srs:
+        return False
+    return srs.get("interval_idx", 0) >= 3 and srs.get("correct_attempts", 0) >= 3
 
 
 async def _get_settings() -> dict:
@@ -883,8 +905,11 @@ async def pulse():
     else:
         weak_topics = []
 
-    # Subject completion (rough): % of questions in subject with mastery >= 60
+    # Subject completion: a question is "completed" after 1 correct solve + 2 successful
+    # SRS revisions (see _is_question_completed). Percent = completed / total per subject.
     subject_completion = []
+    overall_total = 0
+    overall_completed = 0
     for s in SUBJECTS:
         total = await db.questions.count_documents({"subject": s})
         if total == 0:
@@ -892,11 +917,14 @@ async def pulse():
             continue
         ids = [q["id"] async for q in db.questions.find({"subject": s}, {"_id": 0, "id": 1})]
         srs_records = await db.srs.find({"question_id": {"$in": ids}}, {"_id": 0}).to_list(10000)
-        completed = sum(1 for s_rec in srs_records if _compute_mastery(s_rec) >= 60)
+        completed = sum(1 for s_rec in srs_records if _is_question_completed(s_rec))
+        overall_total += total
+        overall_completed += completed
         subject_completion.append({
             "subject": s, "total": total, "completed": completed,
             "percent": round(completed / total * 100, 1),
         })
+    overall_completion_percent = round(overall_completed / overall_total * 100, 1) if overall_total else 0
 
     # PYQ completion
     pyq_total = await db.questions.count_documents({"year": {"$ne": None}})
@@ -941,9 +969,15 @@ async def pulse():
     daily_q_pct = round(min(100, today_qs / max(1, settings["daily_question_target"]) * 100), 1)
     daily_m_pct = round(min(100, today_minutes / max(1, settings["daily_study_minutes_target"]) * 100), 1)
 
+    # User-managed Mission tasks (separate from AI/system-recommended mission)
+    user_missions = await db.user_missions.find(
+        {}, {"_id": 0}
+    ).sort([("completed", 1), ("order", 1), ("created_at", 1)]).to_list(50)
+
     return {
         "today": today,
         "mission": mission,
+        "user_missions": user_missions,
         "momentum": momentum,
         "due_revisions": due_revisions_total,
         "due_srs": due_srs,
@@ -951,6 +985,9 @@ async def pulse():
         "due_revisits": due_revisits,
         "weak_topics": weak_topics,
         "subject_completion": subject_completion,
+        "overall_completion_percent": overall_completion_percent,
+        "overall_completed": overall_completed,
+        "overall_total": overall_total,
         "pyq_percent": pyq_percent,
         "pyq_done": pyq_done,
         "pyq_total": pyq_total,
@@ -968,6 +1005,66 @@ async def pulse():
             "daily_study_minutes_target": settings["daily_study_minutes_target"],
         },
     }
+
+
+# ============================ USER MISSIONS ========================
+@api_router.get("/user-missions")
+async def list_user_missions():
+    docs = await db.user_missions.find({}, {"_id": 0}).sort(
+        [("completed", 1), ("order", 1), ("created_at", 1)]
+    ).to_list(200)
+    return {"items": docs, "total": len(docs)}
+
+
+@api_router.post("/user-missions", response_model=UserMission)
+async def create_user_mission(payload: Dict[str, Any]):
+    if not (payload.get("title") or "").strip():
+        raise HTTPException(400, "title is required")
+    # Place new item at end of incomplete list
+    if "order" not in payload:
+        last = await db.user_missions.find_one(
+            {"completed": False}, {"_id": 0}, sort=[("order", -1)]
+        )
+        payload["order"] = (last["order"] + 1) if last else 0
+    item = UserMission(**{k: v for k, v in payload.items() if k in UserMission.model_fields})
+    await db.user_missions.insert_one(item.model_dump())
+    return item
+
+
+@api_router.put("/user-missions/{mid}")
+async def update_user_mission(mid: str, payload: Dict[str, Any]):
+    update = {k: v for k, v in payload.items() if k in UserMission.model_fields and v is not None}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    # If toggling completion, stamp the timestamp
+    if "completed" in update:
+        update["completed_at"] = now_iso() if update["completed"] else None
+    update["updated_at"] = now_iso()
+    res = await db.user_missions.find_one_and_update(
+        {"id": mid}, {"$set": update}, return_document=True,
+    )
+    if not res:
+        raise HTTPException(404, "Mission not found")
+    return strip_id(res)
+
+
+@api_router.delete("/user-missions/{mid}")
+async def delete_user_mission(mid: str):
+    res = await db.user_missions.delete_one({"id": mid})
+    if res.deleted_count == 0:
+        raise HTTPException(404, "Mission not found")
+    return {"success": True}
+
+
+@api_router.post("/user-missions/reorder")
+async def reorder_user_missions(payload: Dict[str, List[str]]):
+    """Accept an ordered list of mission ids; persist their `order`."""
+    ids = payload.get("ids", [])
+    for idx, mid in enumerate(ids):
+        await db.user_missions.update_one(
+            {"id": mid}, {"$set": {"order": idx, "updated_at": now_iso()}},
+        )
+    return {"reordered": len(ids)}
 
 
 # ============================ MISTAKES BANK ========================

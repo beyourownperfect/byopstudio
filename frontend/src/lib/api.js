@@ -68,4 +68,12 @@ export const mistakesApi = {
   get: (mode) => c.get("/mistakes", { params: { mode } }).then((r) => r.data),
 };
 
+export const userMissionsApi = {
+  list: () => c.get("/user-missions").then((r) => r.data),
+  create: (data) => c.post("/user-missions", data).then((r) => r.data),
+  update: (id, data) => c.put(`/user-missions/${id}`, data).then((r) => r.data),
+  remove: (id) => c.delete(`/user-missions/${id}`).then((r) => r.data),
+  reorder: (ids) => c.post("/user-missions/reorder", { ids }).then((r) => r.data),
+};
+
 export const seed = () => c.post("/seed-demo").then((r) => r.data);

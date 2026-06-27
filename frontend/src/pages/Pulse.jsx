@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, Target, AlertTriangle, BookOpen, Calendar, ChevronRight, Settings as SettingsIcon } from "lucide-react";
+import { Zap, AlertTriangle, BookOpen, Calendar, Settings as SettingsIcon } from "lucide-react";
 import { pulseApi, settingsApi } from "@/lib/api";
 import { SUBJECTS, SUBJECT_LABELS, TID } from "@/lib/constants";
 import { fmtDateLong } from "@/lib/dateUtils";
 import HelpButton from "@/components/HelpButton";
+import MissionCard from "@/components/MissionCard";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
 const MOMENTUM_COLORS = (n) => n >= 70 ? "text-[hsl(var(--success))]" : n >= 40 ? "text-[hsl(var(--warning))]" : "text-[hsl(var(--danger))]";
@@ -59,35 +60,11 @@ export default function Pulse() {
         </div>
       </div>
 
-      {/* Today's Mission */}
-      <div className="card-2 p-5" data-testid={TID.pulseMission}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Target className="w-4 h-4 text-[hsl(var(--accent))]" />
-            <h2 className="font-semibold">Today&apos;s Mission</h2>
-          </div>
-          <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--fg-subtle))]">Top {data.mission.length}</span>
-        </div>
-        {data.mission.length === 0 ? (
-          <p className="text-sm text-[hsl(var(--fg-muted))]">All caught up. Add questions or schedule revisions to keep momentum.</p>
-        ) : (
-          <div className="space-y-1.5">
-            {data.mission.map((m, i) => (
-              <button
-                key={m.id}
-                onClick={() => goToMission(m)}
-                className="w-full text-left px-3 py-2.5 rounded border border-border row-hover flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="mono text-xs text-[hsl(var(--fg-subtle))] w-5">{i + 1}.</span>
-                  <span className="font-medium text-sm truncate">{m.title}</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-[hsl(var(--fg-muted))]" />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Today's Mission (user tasks + AI recommendations) */}
+      <MissionCard
+        recommendations={data.mission || []}
+        onRecommendationClick={goToMission}
+      />
 
       {/* Top row: Momentum, Due, Today's progress */}
       <div className="grid md:grid-cols-3 gap-4">
@@ -164,9 +141,23 @@ export default function Pulse() {
 
       {/* Subject completion */}
       <div className="card-2 p-5" data-testid={TID.pulseSubjectCompletion}>
-        <div className="flex items-center gap-2 mb-3">
-          <BookOpen className="w-4 h-4 text-[hsl(var(--info))]" />
-          <h3 className="font-semibold">Subject Completion</h3>
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-[hsl(var(--info))]" />
+            <h3 className="font-semibold">Subject Completion</h3>
+            <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--fg-subtle))] ml-1">
+              1 solve + 2 SRS revisions = complete
+            </span>
+          </div>
+          <div className="text-right" data-testid="pulse-overall-completion">
+            <span className="text-xs text-[hsl(var(--fg-muted))]">Overall</span>
+            <span className="ml-2 mono font-semibold text-sm">
+              {data.overall_completion_percent ?? 0}%
+            </span>
+            <span className="ml-1 text-[10px] text-[hsl(var(--fg-subtle))]">
+              ({data.overall_completed ?? 0}/{data.overall_total ?? 0})
+            </span>
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
           {data.subject_completion.map((s) => (
