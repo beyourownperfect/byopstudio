@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Star, ExternalLink, Edit3, Play, Check, X as XIcon, Clock, Target } from "lucide-react";
 import Modal from "@/components/Modal";
-import Latex from "@/components/Latex";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
 import { questionsApi } from "@/lib/api";
 import { fmtDate, fmtDateLong, relLabel } from "@/lib/dateUtils";
@@ -106,7 +106,7 @@ export default function QuestionDetailsModal({ open, onClose, questionId, onEdit
           <div>
             <div className="label-x mb-1.5">Statement</div>
             <div className="text-[15px] leading-relaxed">
-              <Latex>{q.statement}</Latex>
+              <MarkdownRenderer>{q.statement}</MarkdownRenderer>
             </div>
           </div>
 
@@ -126,7 +126,7 @@ export default function QuestionDetailsModal({ open, onClose, questionId, onEdit
                       }`}
                     >
                       <span className="mono text-xs font-semibold w-5">{letter}.</span>
-                      <span className="text-sm flex-1"><Latex>{opt}</Latex></span>
+                      <span className="text-sm flex-1"><MarkdownRenderer>{opt}</MarkdownRenderer></span>
                       {isCorrect && <Check className="w-4 h-4 text-[hsl(var(--success))] shrink-0" />}
                     </div>
                   );
@@ -137,7 +137,7 @@ export default function QuestionDetailsModal({ open, onClose, questionId, onEdit
             <div>
               <div className="label-x mb-1.5">Correct answer</div>
               <div className="px-3 py-2 rounded-md border-2 border-[hsl(var(--success))] bg-[hsl(var(--success))]/10 mono text-sm inline-block">
-                <Latex>{String(q.correct_answer)}</Latex>
+                <MarkdownRenderer>{String(q.correct_answer)}</MarkdownRenderer>
               </div>
             </div>
           )}
@@ -147,7 +147,7 @@ export default function QuestionDetailsModal({ open, onClose, questionId, onEdit
             <div>
               <div className="label-x mb-1.5">Explanation</div>
               <div className="text-sm leading-relaxed text-[hsl(var(--fg-muted))]">
-                <Latex>{q.explanation}</Latex>
+                <MarkdownRenderer>{q.explanation}</MarkdownRenderer>
               </div>
             </div>
           )}

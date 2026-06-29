@@ -1,14 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, Plus, Star, Trash2, Edit3, Play, Upload, Download, ExternalLink, X, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Search, Plus, Star, Trash2, Edit3, Play, Upload, Download, ExternalLink, X, ArrowUp, ArrowDown, ArrowUpDown, FileText } from "lucide-react";
 import Papa from "papaparse";
 import { questionsApi, seed } from "@/lib/api";
 import { SUBJECTS, TID } from "@/lib/constants";
 import { debounce, fmtDate, relLabel } from "@/lib/dateUtils";
 import QuestionFormModal from "@/components/QuestionFormModal";
 import QuestionDetailsModal from "@/components/QuestionDetailsModal";
+import OcrPromptModal from "@/components/OcrPromptModal";
 import RevisitMenu from "@/components/RevisitMenu";
-import Latex from "@/components/Latex";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 import HelpButton from "@/components/HelpButton";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
@@ -45,6 +46,7 @@ export default function Repository() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [undoBuffer, setUndoBuffer] = useState(null); // { items, expiresAt }
   const [sortBy, setSortBy] = useState(saved.sortBy || { key: "updated_at", dir: "desc" });
+  const [ocrOpen, setOcrOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -211,6 +213,9 @@ export default function Repository() {
           <HelpButton moduleKey="repository" title={HELP_CONTENT.repository.title} sections={HELP_CONTENT.repository.sections} />
         </div>
         <div className="flex items-center gap-1.5">
+          <button onClick={() => setOcrOpen(true)} className="btn btn-ghost text-xs" data-testid="repo-ocr-btn" title="Copy OCR prompt for AI">
+            <FileText className="w-3.5 h-3.5" /> OCR
+          </button>
           <label className="btn cursor-pointer" data-testid={TID.repoImportCsv}>
             <Upload className="w-3.5 h-3.5" /> Import CSV
             <input type="file" accept=".csv" onChange={onImport} className="hidden" />
@@ -253,21 +258,21 @@ export default function Repository() {
       {/* List */}
       <div className="card-2 overflow-hidden">
         <div className="overflow-x-auto">
-        <div className="min-w-[760px]">
-        <div className="grid grid-cols-[28px_60px_70px_1fr_70px_90px_80px_130px] px-3 py-2 text-[10px] font-semibold tracking-wider uppercase text-[hsl(var(--fg-subtle))] border-b-2 border-border">
-          <input type="checkbox" checked={items.length > 0 && selected.size === items.length} onChange={toggleAll} />
+        <div className="min-w-[780px]">
+        <div className="grid grid-cols-[28px_58px_68px_1fr_72px_92px_80px_132px] px-4 py-2.5 text-[10px] font-semibold tracking-[0.12em] uppercase text-[hsl(var(--fg-subtle))] border-b-2 border-border bg-[hsl(var(--bg-elev-2))] sticky top-0 z-10">
+          <input type="checkbox" checked={items.length > 0 && selected.size === items.length} onChange={toggleAll} className="accent-[hsl(var(--accent))]" />
           <SortHeader label="Subj" onClick={() => toggleSort("subject")} icon={sortIcon("subject")} />
           <SortHeader label="Type" onClick={() => toggleSort("type")} icon={sortIcon("type")} />
           <SortHeader label="Statement" onClick={() => toggleSort("statement")} icon={sortIcon("statement")} />
           <SortHeader label="Mastery" align="right" onClick={() => toggleSort("mastery")} icon={sortIcon("mastery")} />
           <SortHeader label="Next Rev" align="right" onClick={() => toggleSort("next_revision_date")} icon={sortIcon("next_revision_date")} />
-          <SortHeader label="Next Revisit" align="right" onClick={() => toggleSort("next_revisit_date")} icon={sortIcon("next_revisit_date")} />
+          <SortHeader label="Revisit" align="right" onClick={() => toggleSort("next_revisit_date")} icon={sortIcon("next_revisit_date")} />
           <span className="text-right pr-1">Actions</span>
         </div>
 
         {loading ? (
           [...Array(6)].map((_, i) => (
-            <div key={i} className="grid grid-cols-[28px_60px_70px_1fr_70px_90px_80px_130px] gap-2 px-3 py-2.5 border-b border-border">
+            <div key={i} className="grid grid-cols-[28px_58px_68px_1fr_72px_92px_80px_132px] gap-2.5 px-4 py-3 border-b border-border/50">
               {[...Array(8)].map((_, j) => <div key={j} className="skeleton h-4" />)}
             </div>
           ))
@@ -299,6 +304,7 @@ export default function Repository() {
         </div>
       )}
 
+      <OcrPromptModal open={ocrOpen} onClose={() => setOcrOpen(false)} />
       <QuestionFormModal open={formOpen} onClose={() => setFormOpen(false)} editing={editing} onSaved={load} />
       <QuestionDetailsModal
         open={detailsOpen}
@@ -337,13 +343,15 @@ function RepoRow({ q, selected, onToggle, onBookmark, onEdit, onDelete, onPracti
   return (
     <div data-testid={TID.repoRow(q.id)}
       onDoubleClick={handleDoubleClick}
-      className="grid grid-cols-[28px_60px_70px_1fr_70px_90px_80px_130px] gap-2 items-center px-3 py-2.5 border-b border-border row-hover text-sm cursor-default select-none">
-      <input data-testid={TID.repoRowCheckbox(q.id)} type="checkbox" checked={selected} onChange={onToggle} data-no-dbl />
+      className={`grid grid-cols-[28px_58px_68px_1fr_72px_92px_80px_132px] gap-2.5 items-center px-4 py-3 border-b border-border/50 text-sm cursor-default select-none transition-colors ${
+        selected ? "bg-[hsl(var(--accent))]/10 border-l-2 border-l-[hsl(var(--accent))]" : "hover:bg-[hsl(var(--bg-elev))]"
+      }`}>
+      <input data-testid={TID.repoRowCheckbox(q.id)} type="checkbox" checked={selected} onChange={onToggle} data-no-dbl className="accent-[hsl(var(--accent))]" />
       <span className="chip">{q.subject}</span>
       <span className="text-xs text-[hsl(var(--fg-muted))] mono">{q.question_type}</span>
       <div className="min-w-0 truncate" title={q.statement}>
         <span className="text-[hsl(var(--fg-muted))] mr-1 text-xs mono">{q.topic || "—"}</span>
-        <Latex>{q.statement.length > 110 ? q.statement.slice(0, 110) + "…" : q.statement}</Latex>
+        <MarkdownRenderer>{q.statement.length > 110 ? q.statement.slice(0, 110) + "…" : q.statement}</MarkdownRenderer>
       </div>
       <span className={`chip ${masteryColor} justify-self-end`}>{mastery}</span>
       <span className="text-xs text-[hsl(var(--fg-muted))] justify-self-end">{q.next_revision_date ? relLabel(q.next_revision_date) : "—"}</span>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Play, AlertCircle } from "lucide-react";
 import { mistakesApi } from "@/lib/api";
-import Latex from "@/components/Latex";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
 
 const MODES = [
@@ -61,7 +61,7 @@ export default function Mistakes() {
             <div key={q.id} className="px-4 py-3 row-hover flex items-start gap-3">
               <span className="chip chip-danger">{q.subject}</span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm leading-snug line-clamp-2"><Latex>{q.statement}</Latex></div>
+                <div className="text-sm leading-snug line-clamp-2"><MarkdownRenderer>{q.statement}</MarkdownRenderer></div>
                 <div className="mt-1 text-[11px] text-[hsl(var(--fg-muted))]">{q.topic || "—"} · {q.question_type}</div>
               </div>
               <div className="flex items-center gap-1">

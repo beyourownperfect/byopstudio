@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Star, ChevronRight, ExternalLink, Check, X as XIcon, Clock, Play } from "lucide-react";
+import { Star, ChevronRight, ChevronLeft, ExternalLink, Check, X as XIcon, Clock, Play } from "lucide-react";
 import { practiceApi, questionsApi } from "@/lib/api";
 import { SUBJECTS, TID } from "@/lib/constants";
 import { relLabel } from "@/lib/dateUtils";
-import Latex from "@/components/Latex";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
 import HelpButton from "@/components/HelpButton";
 import { HELP_CONTENT } from "@/lib/helpContent";
@@ -32,6 +32,10 @@ export default function Practice() {
   const [submitting, setSubmitting] = useState(false);
   const [excludeIds, setExcludeIds] = useState([]);
   const startTimeRef = useRef(null);
+  // Practice queue — history of seen questions with current index
+  const [queue, setQueue] = useState([]);
+  const [queueIdx, setQueueIdx] = useState(-1);
+  const queueRef = useRef({ queue: [], queueIdx: -1 });
 
   // Stopwatch
   const [elapsed, setElapsed] = useState(0);
@@ -51,6 +55,14 @@ export default function Practice() {
     const params = { mode: m, exclude_ids: exclude.join(",") };
     if (s !== "ALL") params.subject = s;
     const next = await practiceApi.next(params);
+    if (next) {
+      setQueue((q) => {
+        const updated = [...q.slice(0, queueRef.current.queueIdx + 1), next];
+        queueRef.current = { queue: updated, queueIdx: queueRef.current.queueIdx + 1 };
+        return updated;
+      });
+      setQueueIdx((i) => i + 1);
+    }
     setQ(next);
   };
 
@@ -90,8 +102,22 @@ export default function Practice() {
   };
 
   const goNext = async () => {
-    setExcludeIds((ids) => [...ids, q.id]);
-    await fetchNext(mode, subject, [...excludeIds, q.id]);
+    const newExclude = [...excludeIds, q.id];
+    setExcludeIds(newExclude);
+    await fetchNext(mode, subject, newExclude);
+  };
+
+  const goBack = () => {
+    if (queueIdx <= 0) return;
+    const prevQ = queue[queueIdx - 1];
+    if (!prevQ) return;
+    setFeedback(null);
+    setAnswer("");
+    setSelected(new Set());
+    setConfidence(3);
+    setQ(prevQ);
+    setQueueIdx((i) => i - 1);
+    queueRef.current.queueIdx = queueIdx - 1;
   };
 
   // Optimistic bookmark
@@ -165,6 +191,11 @@ export default function Practice() {
           <span className="chip">{q.difficulty}</span>
         </div>
         <div className="flex items-center gap-2 text-xs text-[hsl(var(--fg-muted))]">
+          <div className="flex items-center gap-1 mr-1">
+            <button onClick={goBack} disabled={queueIdx <= 0} className="btn-ghost p-1 disabled:opacity-30" title="Previous"><ChevronLeft className="w-3.5 h-3.5" /></button>
+            <span className="mono text-[11px] tabular-nums">{queueIdx + 1} / {queue.length}</span>
+            <button onClick={goNext} className="btn-ghost p-1" title="Next"><ChevronRight className="w-3.5 h-3.5" /></button>
+          </div>
           <Clock className="w-3 h-3" /> <span className="mono">{Math.floor(elapsed / 60).toString().padStart(2, "0")}:{(elapsed % 60).toString().padStart(2, "0")}</span>
           <HelpButton moduleKey="practice-active" title={HELP_CONTENT.practice.title} sections={HELP_CONTENT.practice.sections} />
         </div>
@@ -172,7 +203,7 @@ export default function Practice() {
 
       <div className="card-2 p-5" data-testid={TID.practiceQuestion}>
         <div className="font-medium leading-relaxed text-[15px]">
-          <Latex>{q.statement}</Latex>
+          <MarkdownRenderer>{q.statement}</MarkdownRenderer>
         </div>
 
         {!isNAT ? (
@@ -195,7 +226,7 @@ export default function Practice() {
                   className={`w-full text-left px-3 py-2 rounded-md border-2 border-border row-hover transition-colors flex items-start gap-2 ${cls}`}
                 >
                   <span className="mono text-xs font-semibold w-5">{letter}.</span>
-                  <span className="text-sm flex-1"><Latex>{opt}</Latex></span>
+                  <span className="text-sm flex-1"><MarkdownRenderer>{opt}</MarkdownRenderer></span>
                   {feedback && isCorrectLetter && <Check className="w-4 h-4 text-[hsl(var(--success))]" />}
                   {wrongPick && <XIcon className="w-4 h-4 text-[hsl(var(--danger))]" />}
                 </button>
@@ -266,15 +297,17 @@ export default function Practice() {
           </div>
           <div>
             <span className="label-x">Correct answer</span>
-            <div className="mt-1 mono text-sm"><Latex>{String(feedback.correct_answer)}</Latex></div>
+            <div className="mt-1 mono text-sm"><MarkdownRenderer>{String(feedback.correct_answer)}</MarkdownRenderer></div>
           </div>
           {feedback.explanation && (
             <div>
               <span className="label-x">Explanation</span>
-              <div className="mt-1 text-sm leading-relaxed"><Latex>{feedback.explanation}</Latex></div>
+              <div className="mt-1 text-sm leading-relaxed"><MarkdownRenderer>{feedback.explanation}</MarkdownRenderer></div>
             </div>
           )}
-          <div className="flex justify-end">
+          <div className="flex justify-end items-center gap-2">
+            <button onClick={goBack} disabled={queueIdx <= 0} className="btn text-xs disabled:opacity-30"><ChevronLeft className="w-3.5 h-3.5" /> Prev</button>
+            <span className="text-[11px] mono text-[hsl(var(--fg-muted))]">{queueIdx + 1}/{queue.length}</span>
             <button data-testid={TID.practiceNext} onClick={goNext} className="btn btn-primary">
               Next <ChevronRight className="w-3.5 h-3.5" />
             </button>

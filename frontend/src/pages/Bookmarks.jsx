@@ -4,7 +4,7 @@ import { Star, Play, ExternalLink } from "lucide-react";
 import { questionsApi } from "@/lib/api";
 import { TID } from "@/lib/constants";
 import { relLabel } from "@/lib/dateUtils";
-import Latex from "@/components/Latex";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
 
 export default function Bookmarks() {
@@ -50,7 +50,7 @@ export default function Bookmarks() {
                 <span className="chip mono text-[10px]">{q.mastery ?? 0}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm leading-snug line-clamp-2"><Latex>{q.statement}</Latex></div>
+                <div className="text-sm leading-snug line-clamp-2"><MarkdownRenderer>{q.statement}</MarkdownRenderer></div>
                 <div className="mt-1 text-[11px] text-[hsl(var(--fg-muted))] flex items-center gap-2">
                   <span>{q.topic || "—"}</span>
                   <span>·</span>
