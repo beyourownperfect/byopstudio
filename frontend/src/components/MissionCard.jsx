@@ -1,23 +1,15 @@
 import React, { useEffect, useState } from "react";
 import {
-  Target, Plus, Check, Trash2, GripVertical, Sparkles, ChevronRight,
+  Target, Plus, Check, Trash2, GripVertical,
   Pencil, X as XIcon,
 } from "lucide-react";
 import { userMissionsApi } from "@/lib/api";
 
-/**
- * Today's Mission card with TWO clearly separated lists:
- *  1. AI / system recommendations (`recommendations` prop, read-only, deep-link).
- *  2. User-authored tasks (CRUD + reorder + complete).
- *
- * Reordering is keyboard-friendly via Up/Down buttons. Drag-and-drop is intentionally
- * avoided here to keep the touch-friendly mobile UX consistent.
- */
-export default function MissionCard({ recommendations = [], onRecommendationClick }) {
+export default function MissionCard() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newTitle, setNewTitle] = useState("");
-  const [editing, setEditing] = useState(null); // { id, title }
+  const [editing, setEditing] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -37,7 +29,6 @@ export default function MissionCard({ recommendations = [], onRecommendationClic
   };
 
   const toggle = async (m) => {
-    // optimistic
     setItems((cur) => cur.map((x) => x.id === m.id ? { ...x, completed: !x.completed } : x));
     try { await userMissionsApi.update(m.id, { completed: !m.completed }); }
     catch { load(); }
@@ -61,7 +52,6 @@ export default function MissionCard({ recommendations = [], onRecommendationClic
   };
 
   const move = async (idx, dir) => {
-    // Only reorder amongst incomplete items
     const incomplete = items.filter((x) => !x.completed);
     const j = idx + dir;
     if (j < 0 || j >= incomplete.length) return;
@@ -88,151 +78,120 @@ export default function MissionCard({ recommendations = [], onRecommendationClic
         </span>
       </div>
 
-      {/* System recommendations */}
-      {recommendations.length > 0 && (
-        <div className="mb-4" data-testid="mission-recommendations">
-          <div className="label-x mb-1.5 flex items-center gap-1">
-            <Sparkles className="w-3 h-3 text-[hsl(var(--accent))]" /> Recommended
-          </div>
-          <div className="space-y-1.5">
-            {recommendations.map((m, i) => (
+      {loading ? (
+        <div className="space-y-2">{[...Array(2)].map((_, i) => <div key={i} className="skeleton h-9" />)}</div>
+      ) : (
+        <div className="space-y-1.5">
+          {incomplete.length === 0 && completed.length === 0 && (
+            <p className="text-xs text-[hsl(var(--fg-muted))]">
+              No tasks yet. Add anything you want to commit to today.
+            </p>
+          )}
+
+          {incomplete.map((m, i) => (
+            <div
+              key={m.id}
+              data-testid={`mission-user-${m.id}`}
+              className="group px-2 py-1.5 rounded border border-border row-hover flex items-center gap-2"
+            >
+              <span className="text-[hsl(var(--fg-subtle))] cursor-grab" title="Use ↑/↓ to reorder">
+                <GripVertical className="w-3.5 h-3.5" />
+              </span>
               <button
-                key={m.id}
-                onClick={() => onRecommendationClick?.(m)}
-                data-testid={`mission-rec-${m.kind || i}`}
-                className="w-full text-left px-3 py-2 rounded border border-border row-hover flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="mono text-xs text-[hsl(var(--fg-subtle))] w-5">{i + 1}.</span>
-                  <span className="font-medium text-sm truncate">{m.title}</span>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-[hsl(var(--fg-muted))]" />
+                onClick={() => toggle(m)}
+                data-testid={`mission-user-toggle-${m.id}`}
+                className="w-4 h-4 rounded border-2 border-border flex items-center justify-center hover:border-[hsl(var(--accent))]"
+                aria-label="Mark complete"
+              />
+              {editing?.id === m.id ? (
+                <input
+                  autoFocus
+                  value={editing.title}
+                  onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                  onBlur={saveEdit}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditing(null); }}
+                  className="input flex-1 h-7 text-sm"
+                  data-testid={`mission-user-edit-input-${m.id}`}
+                />
+              ) : (
+                <span
+                  onDoubleClick={() => setEditing({ id: m.id, title: m.title })}
+                  className="flex-1 text-sm truncate select-none"
+                  title="Double-click to edit"
+                >
+                  {m.title}
+                </span>
+              )}
+              <div className="hidden sm:flex items-center gap-0.5">
+                <button onClick={() => move(i, -1)} disabled={i === 0}
+                  data-testid={`mission-user-up-${m.id}`}
+                  className="btn-ghost p-1 text-xs disabled:opacity-30" aria-label="Move up">▲</button>
+                <button onClick={() => move(i, 1)} disabled={i === incomplete.length - 1}
+                  data-testid={`mission-user-down-${m.id}`}
+                  className="btn-ghost p-1 text-xs disabled:opacity-30" aria-label="Move down">▼</button>
+              </div>
+              <button onClick={() => setEditing({ id: m.id, title: m.title })}
+                data-testid={`mission-user-edit-${m.id}`}
+                className="btn-ghost p-1 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Edit">
+                <Pencil className="w-3.5 h-3.5" />
               </button>
-            ))}
-          </div>
+              <button onClick={() => remove(m)}
+                data-testid={`mission-user-delete-${m.id}`}
+                className="btn-ghost p-1 text-[hsl(var(--danger))] opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Delete">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+
+          {completed.length > 0 && (
+            <div className="pt-2 mt-2 border-t border-border/60 space-y-1">
+              {completed.map((m) => (
+                <div
+                  key={m.id}
+                  data-testid={`mission-user-done-${m.id}`}
+                  className="group px-2 py-1.5 rounded flex items-center gap-2 text-[hsl(var(--fg-muted))]"
+                >
+                  <button
+                    onClick={() => toggle(m)}
+                    data-testid={`mission-user-toggle-${m.id}`}
+                    className="w-4 h-4 rounded border-2 border-[hsl(var(--success))] bg-[hsl(var(--success))]/15 flex items-center justify-center"
+                    aria-label="Mark incomplete"
+                  >
+                    <Check className="w-3 h-3 text-[hsl(var(--success))]" />
+                  </button>
+                  <span className="flex-1 text-sm line-through truncate">{m.title}</span>
+                  <button onClick={() => remove(m)}
+                    data-testid={`mission-user-delete-${m.id}`}
+                    className="btn-ghost p-1 text-[hsl(var(--danger))] opacity-0 group-hover:opacity-100" aria-label="Delete">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* User tasks */}
-      <div data-testid="mission-user-tasks">
-        <div className="label-x mb-1.5">My Tasks</div>
-        {loading ? (
-          <div className="space-y-2">{[...Array(2)].map((_, i) => <div key={i} className="skeleton h-9" />)}</div>
-        ) : (
-          <div className="space-y-1.5">
-            {incomplete.length === 0 && completed.length === 0 && (
-              <p className="text-xs text-[hsl(var(--fg-muted))]">
-                No personal tasks. Add anything you want to commit to today.
-              </p>
-            )}
-
-            {incomplete.map((m, i) => (
-              <div
-                key={m.id}
-                data-testid={`mission-user-${m.id}`}
-                className="group px-2 py-1.5 rounded border border-border row-hover flex items-center gap-2"
-              >
-                <span className="text-[hsl(var(--fg-subtle))] cursor-grab" title="Use ↑/↓ to reorder">
-                  <GripVertical className="w-3.5 h-3.5" />
-                </span>
-                <button
-                  onClick={() => toggle(m)}
-                  data-testid={`mission-user-toggle-${m.id}`}
-                  className="w-4 h-4 rounded border-2 border-border flex items-center justify-center hover:border-[hsl(var(--accent))]"
-                  aria-label="Mark complete"
-                >
-                  {/* unchecked */}
-                </button>
-                {editing?.id === m.id ? (
-                  <input
-                    autoFocus
-                    value={editing.title}
-                    onChange={(e) => setEditing({ ...editing, title: e.target.value })}
-                    onBlur={saveEdit}
-                    onKeyDown={(e) => { if (e.key === "Enter") saveEdit(); if (e.key === "Escape") setEditing(null); }}
-                    className="input flex-1 h-7 text-sm"
-                    data-testid={`mission-user-edit-input-${m.id}`}
-                  />
-                ) : (
-                  <span
-                    onDoubleClick={() => setEditing({ id: m.id, title: m.title })}
-                    className="flex-1 text-sm truncate select-none"
-                    title="Double-click to edit"
-                  >
-                    {m.title}
-                  </span>
-                )}
-                <div className="hidden sm:flex items-center gap-0.5">
-                  <button onClick={() => move(i, -1)} disabled={i === 0}
-                    data-testid={`mission-user-up-${m.id}`}
-                    className="btn-ghost p-1 text-xs disabled:opacity-30" aria-label="Move up">▲</button>
-                  <button onClick={() => move(i, 1)} disabled={i === incomplete.length - 1}
-                    data-testid={`mission-user-down-${m.id}`}
-                    className="btn-ghost p-1 text-xs disabled:opacity-30" aria-label="Move down">▼</button>
-                </div>
-                <button onClick={() => setEditing({ id: m.id, title: m.title })}
-                  data-testid={`mission-user-edit-${m.id}`}
-                  className="btn-ghost p-1 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Edit">
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                <button onClick={() => remove(m)}
-                  data-testid={`mission-user-delete-${m.id}`}
-                  className="btn-ghost p-1 text-[hsl(var(--danger))] opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Delete">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-
-            {completed.length > 0 && (
-              <div className="pt-2 mt-2 border-t border-border/60 space-y-1">
-                {completed.map((m) => (
-                  <div
-                    key={m.id}
-                    data-testid={`mission-user-done-${m.id}`}
-                    className="group px-2 py-1.5 rounded flex items-center gap-2 text-[hsl(var(--fg-muted))]"
-                  >
-                    <button
-                      onClick={() => toggle(m)}
-                      data-testid={`mission-user-toggle-${m.id}`}
-                      className="w-4 h-4 rounded border-2 border-[hsl(var(--success))] bg-[hsl(var(--success))]/15 flex items-center justify-center"
-                      aria-label="Mark incomplete"
-                    >
-                      <Check className="w-3 h-3 text-[hsl(var(--success))]" />
-                    </button>
-                    <span className="flex-1 text-sm line-through truncate">{m.title}</span>
-                    <button onClick={() => remove(m)}
-                      data-testid={`mission-user-delete-${m.id}`}
-                      className="btn-ghost p-1 text-[hsl(var(--danger))] opacity-0 group-hover:opacity-100" aria-label="Delete">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        <form onSubmit={add} className="mt-3 flex items-center gap-2">
-          <input
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="Add a task… (e.g. revise OS scheduling)"
-            data-testid="mission-user-input"
-            className="input flex-1 h-9 text-sm"
-            maxLength={200}
-          />
-          <button type="submit" disabled={!newTitle.trim()}
-            data-testid="mission-user-add"
-            className="btn btn-primary disabled:opacity-40">
-            <Plus className="w-3.5 h-3.5" /> Add
+      <form onSubmit={add} className="mt-3 flex items-center gap-2">
+        <input
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          placeholder="Add a task… (e.g. revise OS scheduling)"
+          data-testid="mission-user-input"
+          className="input flex-1 h-9 text-sm"
+          maxLength={200}
+        />
+        <button type="submit" disabled={!newTitle.trim()}
+          data-testid="mission-user-add"
+          className="btn btn-primary disabled:opacity-40">
+          <Plus className="w-3.5 h-3.5" /> Add
+        </button>
+        {newTitle && (
+          <button type="button" onClick={() => setNewTitle("")} className="btn-ghost p-1.5">
+            <XIcon className="w-3.5 h-3.5" />
           </button>
-          {newTitle && (
-            <button type="button" onClick={() => setNewTitle("")} className="btn-ghost p-1.5">
-              <XIcon className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </form>
-      </div>
+        )}
+      </form>
     </div>
   );
 }

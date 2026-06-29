@@ -41,6 +41,40 @@
     --radius: 0.5rem;
   }
 
+  [data-theme="light"] {
+    --bg: 0 0% 98%;
+    --bg-elev: 0 0% 100%;
+    --bg-elev-2: 0 0% 94%;
+    --fg: 0 0% 12%;
+    --fg-muted: 0 0% 38%;
+    --fg-subtle: 0 0% 52%;
+    --border: 0 0% 84%;
+    --border-strong: 0 0% 68%;
+    --accent: 217 91% 48%;
+    --accent-fg: 0 0% 100%;
+    --success: 142 60% 38%;
+    --warning: 38 85% 45%;
+    --danger: 0 75% 48%;
+    --info: 199 85% 42%;
+
+    --background: var(--bg);
+    --foreground: var(--fg);
+    --card: var(--bg-elev);
+    --card-foreground: var(--fg);
+    --popover: var(--bg-elev-2);
+    --popover-foreground: var(--fg);
+    --primary: var(--accent);
+    --primary-foreground: var(--accent-fg);
+    --secondary: var(--bg-elev-2);
+    --secondary-foreground: var(--fg);
+    --muted: var(--bg-elev);
+    --muted-foreground: var(--fg-muted);
+    --destructive: var(--danger);
+    --destructive-foreground: 0 0% 100%;
+    --input: var(--border);
+    --ring: var(--accent);
+  }
+
   * { @apply border-border; }
 
   html, body, #root {
@@ -51,6 +85,12 @@
     -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'cv02','cv03','cv04','cv11';
     color-scheme: dark;
+  }
+
+  html[data-theme="light"],
+  html[data-theme="light"] body,
+  html[data-theme="light"] #root {
+    color-scheme: light;
   }
 
   body { @apply min-h-screen; }

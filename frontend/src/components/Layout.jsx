@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Zap, BookOpen, Calendar, Activity, Command as CmdIcon, Menu, X } from "lucide-react";
+import { Zap, BookOpen, Calendar, Activity, Command as CmdIcon, Menu, X, Sun, Moon } from "lucide-react";
 import { TID } from "@/lib/constants";
 import CommandPalette from "@/components/CommandPalette";
 import JanCountdown from "@/components/JanCountdown";
+import useTheme from "@/hooks/useTheme";
 
 const tabs = [
   { to: "/solve/repository", label: "SOLVE", tid: TID.navSolve, icon: BookOpen, match: "/solve" },
@@ -24,6 +25,7 @@ export default function Layout() {
   const isSolve = loc.pathname.startsWith("/solve");
   const isMac = typeof navigator !== "undefined" && navigator.platform?.toLowerCase().includes("mac");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme, toggle } = useTheme();
 
   const closeMobile = () => setMobileOpen(false);
 
@@ -63,6 +65,16 @@ export default function Layout() {
 
           <div className="flex items-center gap-2">
             <JanCountdown />
+
+            {/* Theme toggle */}
+            <button
+              onClick={toggle}
+              className="btn-ghost p-1.5"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
 
             <button
               data-testid={TID.cmdK}

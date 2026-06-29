@@ -109,4 +109,20 @@ export const HELP_CONTENT = {
       },
     ],
   },
+
+  lectures: {
+    title: "Lecture Progress",
+    sections: [
+      { title: "Fast logging", body: "Add a lecture in under 10 seconds — subject, topic, name, number (e.g. 12/42), duration, and completion %. Toggle Notes ✓ and Revision ✓ inline." },
+      { title: "Tracking", body: "Lectures are grouped Subject → Topic. Each level shows progress bars so you can see exactly how much ground you've covered." },
+    ],
+  },
+
+  "subject-completion": {
+    title: "Subject Completion",
+    sections: [
+      { title: "Checklist", body: "Configurable per-subject checklist: Lectures, Notes, Flashcards, PYQs, Revision, Subject Test (core), plus DPP & Weekly Quiz (optional). Final milestone: can you explain the complete topic without notes?" },
+      { title: "Independent from Pulse", body: "This checklist is entirely manual and self-contained. It will integrate with Pulse in a future update." },
+    ],
+  },
 };

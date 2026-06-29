@@ -57,6 +57,64 @@ REVISIT_TYPES = [
 ]
 
 
+class Lecture(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    subject: str
+    topic: str = ""
+    lecture_name: str = ""
+    lecture_number: str = ""
+    duration_min: int = 0
+    completion_percent: int = 0
+    notes_done: bool = False
+    revision_done: bool = False
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+
+
+class SubjectCompletion(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    subject: str
+    topic: str = ""
+    lectures_completed: bool = False
+    notes_created: bool = False
+    flashcards_created: bool = False
+    pyqs_completed: bool = False
+    revision_completed: bool = False
+    subject_test_completed: bool = False
+    dpp_completed: bool = False
+    weekly_quiz_completed: bool = False
+    can_explain_without_notes: bool = False
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
+
+
+def _compute_subject_completion(checklist: dict) -> dict:
+    core_keys = [
+        "lectures_completed",
+        "notes_created",
+        "flashcards_created",
+        "pyqs_completed",
+        "revision_completed",
+        "subject_test_completed",
+    ]
+    optional_keys = ["dpp_completed", "weekly_quiz_completed", "can_explain_without_notes"]
+    core_done = sum(1 for k in core_keys if checklist.get(k))
+    core_total = len(core_keys)
+    core_pct = round(core_done / core_total * 100, 1) if core_total else 0
+    all_done = core_done + sum(1 for k in optional_keys if checklist.get(k))
+    all_total = core_total + len(optional_keys)
+    all_pct = round(all_done / all_total * 100, 1) if all_total else 0
+    return {
+        "core_completed": core_done,
+        "core_total": core_total,
+        "core_percent": core_pct,
+        "all_completed": all_done,
+        "all_total": all_total,
+        "all_percent": all_pct,
+        "can_explain_without_notes": checklist.get("can_explain_without_notes", False),
+    }
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -1566,6 +1624,82 @@ async def seed_demo():
     except Exception as exc:
         logger.exception("Seed demo failed")
         raise HTTPException(500, detail=f"Seed demo failed: {exc}")
+
+
+# ============================ LECTURES ==============================
+@api_router.post("/lectures", response_model=Lecture)
+async def create_lecture(payload: Dict[str, Any]):
+    if payload.get("subject") not in SUBJECTS:
+        raise HTTPException(400, f"Invalid subject. Use one of {SUBJECTS}")
+    lec = Lecture(**{k: v for k, v in payload.items() if k in Lecture.model_fields})
+    await db.lectures.insert_one(lec.model_dump())
+    return lec
+
+
+@api_router.get("/lectures")
+async def list_lectures(subject: Optional[str] = None):
+    query: Dict[str, Any] = {}
+    if subject and subject != "ALL":
+        query["subject"] = subject
+    docs = await db.lectures.find(query, {"_id": 0}).sort("created_at", -1).to_list(5000)
+    return {"items": docs, "total": len(docs)}
+
+
+@api_router.put("/lectures/{lid}")
+async def update_lecture(lid: str, payload: Dict[str, Any]):
+    update = {k: v for k, v in payload.items() if k in Lecture.model_fields and v is not None}
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    update["updated_at"] = now_iso()
+    res = await db.lectures.find_one_and_update({"id": lid}, {"$set": update}, return_document=True)
+    if not res:
+        raise HTTPException(404, "Lecture not found")
+    return strip_id(res)
+
+
+@api_router.delete("/lectures/{lid}")
+async def delete_lecture(lid: str):
+    res = await db.lectures.delete_one({"id": lid})
+    if res.deleted_count == 0:
+        raise HTTPException(404)
+    return {"success": True}
+
+
+# ============================ SUBJECT COMPLETION ===================
+@api_router.get("/subject-completion")
+async def list_subject_completion(subject: Optional[str] = None, topic: Optional[str] = None):
+    query: Dict[str, Any] = {}
+    if subject and subject != "ALL":
+        query["subject"] = subject
+    if topic:
+        query["topic"] = topic
+    docs = await db.subject_completion.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
+    items = []
+    for d in docs:
+        items.append({**d, "_calc": _compute_subject_completion(d)})
+    return {"items": items, "total": len(items)}
+
+
+@api_router.post("/subject-completion")
+async def upsert_subject_completion(payload: Dict[str, Any]):
+    if payload.get("subject") not in SUBJECTS:
+        raise HTTPException(400, f"Invalid subject. Use one of {SUBJECTS}")
+    subject = payload["subject"]
+    topic = payload.get("topic", "")
+    update = {k: v for k, v in payload.items() if k in SubjectCompletion.model_fields}
+    update["updated_at"] = now_iso()
+    existing = await db.subject_completion.find_one(
+        {"subject": subject, "topic": topic}, {"_id": 0}
+    )
+    if existing:
+        await db.subject_completion.update_one(
+            {"id": existing["id"]}, {"$set": update}
+        )
+        doc = await db.subject_completion.find_one({"id": existing["id"]}, {"_id": 0})
+        return {**doc, "_calc": _compute_subject_completion(doc)}
+    item = SubjectCompletion(**update)
+    await db.subject_completion.insert_one(item.model_dump())
+    return {**item.model_dump(), "_calc": _compute_subject_completion(item.model_dump())}
 
 
 # ============================ MOUNT =================================

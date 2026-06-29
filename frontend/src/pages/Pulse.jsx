@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, AlertTriangle, BookOpen, Calendar, Settings as SettingsIcon } from "lucide-react";
+import { Zap, AlertTriangle, BookOpen, Calendar, Settings as SettingsIcon, ChevronDown } from "lucide-react";
 import { pulseApi, settingsApi } from "@/lib/api";
 import { SUBJECTS, SUBJECT_LABELS, TID } from "@/lib/constants";
 import { fmtDateLong } from "@/lib/dateUtils";
@@ -15,6 +15,7 @@ export default function Pulse() {
   const [data, setData] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [examDate, setExamDate] = useState("");
+  const [weakExpanded, setWeakExpanded] = useState(false);
 
   const load = async () => setData(await pulseApi.get());
   useEffect(() => { load(); }, []);
@@ -33,13 +34,6 @@ export default function Pulse() {
       </div>
     );
   }
-
-  const goToMission = (m) => {
-    if (m.kind === "due_revisions") navigate("/solve/practice?mode=due");
-    else if (m.kind === "due_revisits") navigate("/solve/repository?filter=revisit_today");
-    else if (m.kind === "weak_topic") navigate(`/solve/practice?mode=weak&subject=${m.subject || "ALL"}`);
-    else if (m.kind === "new_practice") navigate(`/solve/practice?mode=new&subject=${m.subject || "ALL"}`);
-  };
 
   return (
     <div className="space-y-4">
@@ -60,11 +54,8 @@ export default function Pulse() {
         </div>
       </div>
 
-      {/* Today's Mission (user tasks + AI recommendations) */}
-      <MissionCard
-        recommendations={data.mission || []}
-        onRecommendationClick={goToMission}
-      />
+      {/* Today's Mission (user-defined tasks only) */}
+      <MissionCard />
 
       {/* Top row: Momentum, Due, Today's progress */}
       <div className="grid md:grid-cols-3 gap-4">
@@ -100,30 +91,44 @@ export default function Pulse() {
         </div>
       </div>
 
-      {/* Weakness + Readiness */}
+      {/* Weak Topics (collapsible) + Readiness */}
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="card-2 p-5" data-testid={TID.pulseWeak}>
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-4 h-4 text-[hsl(var(--warning))]" />
-            <h3 className="font-semibold">Weak Topics</h3>
-          </div>
-          {data.weak_topics.length === 0 ? (
-            <p className="text-sm text-[hsl(var(--fg-muted))]">Not enough data yet — solve a few more to surface weak areas.</p>
-          ) : (
-            <div className="space-y-2">
-              {data.weak_topics.map((w, i) => (
-                <button key={i} onClick={() => navigate(`/solve/practice?mode=weak&subject=${w.subject}`)}
-                  className="w-full text-left px-3 py-2.5 rounded border border-border row-hover">
-                  <div className="flex items-center justify-between text-sm">
-                    <div>
-                      <span className="font-medium">{w.subject}</span>
-                      <span className="text-[hsl(var(--fg-muted))] ml-2">{w.topic}</span>
-                    </div>
-                    <span className="chip chip-danger">{w.accuracy}%</span>
-                  </div>
-                  <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-1">Solve 10 {w.subject} questions →</div>
-                </button>
-              ))}
+        <div className="card-2 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setWeakExpanded(!weakExpanded)}
+            className="w-full flex items-center justify-between gap-2 px-5 py-4 text-left hover:bg-[hsl(var(--bg-elev))]/60 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-[hsl(var(--warning))]" />
+              <h3 className="font-semibold text-sm">Weak Topics</h3>
+              {data.weak_topics.length > 0 && (
+                <span className="chip chip-danger text-[10px]">{data.weak_topics.length}</span>
+              )}
+            </div>
+            <ChevronDown className={`h-3.5 w-3.5 text-[hsl(var(--fg-muted))] transition-transform ${weakExpanded ? "rotate-180" : ""}`} />
+          </button>
+          {weakExpanded && (
+            <div className="border-t border-border px-5 pb-4 pt-1">
+              {data.weak_topics.length === 0 ? (
+                <p className="text-sm text-[hsl(var(--fg-muted))] py-3">Not enough data yet — solve a few more to surface weak areas.</p>
+              ) : (
+                <div className="space-y-2 mt-2">
+                  {data.weak_topics.map((w, i) => (
+                    <button key={i} onClick={() => navigate(`/solve/practice?mode=weak&subject=${w.subject}`)}
+                      className="w-full text-left px-3 py-2.5 rounded border border-border row-hover">
+                      <div className="flex items-center justify-between text-sm">
+                        <div>
+                          <span className="font-medium">{w.subject}</span>
+                          <span className="text-[hsl(var(--fg-muted))] ml-2">{w.topic}</span>
+                        </div>
+                        <span className="chip chip-danger">{w.accuracy}%</span>
+                      </div>
+                      <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-1">Solve 10 {w.subject} questions →</div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

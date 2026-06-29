@@ -87,4 +87,16 @@ export const userMissionsApi = {
     c.post("/user-missions/reorder", { ids }).then((r) => r.data),
 };
 
+export const lecturesApi = {
+  list: (params = {}) => c.get("/lectures", { params }).then((r) => r.data),
+  create: (data) => c.post("/lectures", data).then((r) => r.data),
+  update: (id, data) => c.put(`/lectures/${id}`, data).then((r) => r.data),
+  remove: (id) => c.delete(`/lectures/${id}`).then((r) => r.data),
+};
+
+export const subjectCompletionApi = {
+  list: (params = {}) => c.get("/subject-completion", { params }).then((r) => r.data),
+  upsert: (data) => c.post("/subject-completion", data).then((r) => r.data),
+};
+
 export const seed = () => c.post("/seed-demo").then((r) => r.data);
