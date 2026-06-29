@@ -129,9 +129,10 @@ export default function Log() {
   const datesKey = dates.join("|");
 
   useEffect(() => {
+    const dateList = datesKey ? datesKey.split("|") : [];
     setExpandedDates((prev) => {
       const next = { ...prev };
-      dates.forEach((date, index) => {
+      dateList.forEach((date, index) => {
         if (!(date in next)) next[date] = index === 0;
       });
       return next;
