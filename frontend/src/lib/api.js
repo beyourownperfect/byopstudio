@@ -43,6 +43,7 @@ export const srsApi = {
 export const logsApi = {
   list: (params = {}) => c.get("/study-logs", { params }).then((r) => r.data),
   create: (data) => c.post("/study-logs", data).then((r) => r.data),
+  update: (id, data) => c.put(`/study-logs/${id}`, data).then((r) => r.data),
   remove: (id) => c.delete(`/study-logs/${id}`).then((r) => r.data),
 };
 

@@ -820,6 +820,23 @@ async def delete_log(log_id: str):
     return {"success": True}
 
 
+@api_router.put("/study-logs/{log_id}")
+async def update_log(log_id: str, payload: Dict[str, Any]):
+    update = {
+        k: v
+        for k, v in payload.items()
+        if k in StudyLog.model_fields and v is not None
+    }
+    if not update:
+        raise HTTPException(400, "No fields to update")
+    res = await db.study_logs.find_one_and_update(
+        {"id": log_id}, {"$set": update}, return_document=True
+    )
+    if not res:
+        raise HTTPException(404, "Log not found")
+    return strip_id(res)
+
+
 # ============================ TIMELINE =============================
 @api_router.post("/timeline", response_model=TimelineEntry)
 async def create_timeline_entry(payload: Dict[str, Any]):

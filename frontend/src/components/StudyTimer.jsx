@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Play, Pause, RotateCcw, Maximize2, X, Save } from "lucide-react";
 import { logsApi } from "@/lib/api";
+import { SUBJECTS } from "@/lib/constants";
 import { todayISO } from "@/lib/dateUtils";
 
 const STOPWATCH_COLOR = "hsl(170 70% 45%)";
@@ -19,16 +20,37 @@ function formatTime(totalSeconds) {
 }
 
 export default function StudyTimer() {
-  const [mode, setMode] = useState("stopwatch");
-  const [running, setRunning] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [totalSec, setTotalSec] = useState(1500);
-  const [countdownMins, setCountdownMins] = useState(25);
-  const [countdownSecs, setCountdownSecs] = useState(0);
+  const loadState = () => {
+    try {
+      const s = sessionStorage.getItem("byop.timer");
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  };
+  const saveState = (st) => {
+    try { sessionStorage.setItem("byop.timer", JSON.stringify(st)); } catch {}
+  };
+
+  const saved = loadState();
+  const [mode, setMode] = useState(saved?.mode || "stopwatch");
+  const [running, setRunningState] = useState(false);
+  const [elapsed, setElapsed] = useState(saved?.elapsed || 0);
+  const [totalSec, setTotalSec] = useState(saved?.totalSec || 1500);
+  const [countdownMins, setCountdownMins] = useState(saved?.countdownMins || 25);
+  const [countdownSecs, setCountdownSecs] = useState(saved?.countdownSecs || 0);
+  const [timerSubject, setTimerSubject] = useState(saved?.timerSubject || "OS");
   const [focusOpen, setFocusOpen] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const intervalRef = useRef(null);
   const loggedRef = useRef(false);
+
+  const setRunning = (r) => {
+    setRunningState(r);
+    if (r) loggedRef.current = false;
+  };
+
+  useEffect(() => {
+    saveState({ mode, elapsed, totalSec, countdownMins, countdownSecs, timerSubject, running });
+  }, [mode, elapsed, totalSec, countdownMins, countdownSecs, timerSubject, running]);
 
   const start = useCallback(() => {
     if (running) return;
@@ -71,7 +93,7 @@ export default function StudyTimer() {
       logsApi.create({
         date: todayISO(),
         activity: "Practice",
-        subject: "OS",
+        subject: timerSubject,
         topic: "",
         duration_min: minutes,
         remarks: `Countdown timer: ${countdownMins}m session`,
@@ -81,7 +103,7 @@ export default function StudyTimer() {
       }).catch(() => {});
       new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gICAf39/gICAf3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f4B/f3+AgICAf3+AgH9/f3+AgICAf3+AgICAf3+AgICAf39/gICAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gID//w==").play().catch(() => {});
     }
-  }, [elapsed, running, mode, totalSec, countdownMins]);
+  }, [elapsed, running, mode, totalSec, countdownMins, timerSubject]);
 
   const switchMode = (m) => {
     setRunning(false);
@@ -98,7 +120,7 @@ export default function StudyTimer() {
     await logsApi.create({
       date: todayISO(),
       activity: "Practice",
-      subject: "OS",
+      subject: timerSubject,
       topic: "",
       duration_min: minutes,
       remarks:
@@ -167,6 +189,14 @@ export default function StudyTimer() {
             <span className="text-[10px] text-[hsl(var(--fg-muted))]">s</span>
           </div>
         )}
+
+        {/* Subject picker */}
+        <select value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
+          className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-1.5 py-0.5 text-[10px] outline-none focus:border-[hsl(var(--accent))]"
+          title="Subject for auto-log"
+        >
+          {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
 
         {/* Time display */}
         <span

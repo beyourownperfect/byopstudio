@@ -65,6 +65,12 @@ export default function Log() {
   const [completionExpanded, setCompletionExpanded] = useState(false);
   const [completionSubject, setCompletionSubject] = useState("ALL");
 
+  // Inline edit state for daily log rows
+  const [editingLogId, setEditingLogId] = useState(null);
+  const [editingLogField, setEditingLogField] = useState(null);
+  const [editingLogVal, setEditingLogVal] = useState("");
+  const editInputRef = useRef(null);
+
   const load = async () => {
     let start;
     if (view === "daily") start = todayISO();
@@ -136,6 +142,52 @@ export default function Log() {
     setSwTopic("");
     setSwJournal("");
     load();
+  };
+
+  // Inline edit for daily log rows
+  const startLogEdit = (log, field) => {
+    setEditingLogId(log.id);
+    setEditingLogField(field);
+    if (field === "duration_min") {
+      setEditingLogVal(String(log.duration_min || ""));
+    } else if (field === "questions") {
+      setEditingLogVal(log.questions_attempted ? `${log.questions_correct || 0}/${log.questions_attempted}` : "");
+    } else {
+      setEditingLogVal(String(log[field] ?? ""));
+    }
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  };
+
+  const commitLogEdit = async (log) => {
+    if (!editingLogId) return;
+    const field = editingLogField;
+    let value = editingLogVal.trim();
+    if (value === String(log[field] ?? "")) { setEditingLogId(null); return; }
+
+    const payload = {};
+    if (field === "duration_min") {
+      payload.duration_min = parseInt(value, 10) || 0;
+    } else if (field === "questions") {
+      // Parse "correct/total" format
+      const parts = value.split("/").map((s) => parseInt(s.trim(), 10));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && parts[1] >= parts[0]) {
+        payload.questions_correct = parts[0];
+        payload.questions_attempted = parts[1];
+      } else {
+        payload.questions_attempted = parseInt(value, 10) || 0;
+        payload.questions_correct = 0;
+      }
+    } else {
+      payload[field] = value;
+    }
+    setEditingLogId(null);
+    setLogs((prev) => prev.map((l) => (l.id === log.id ? { ...l, ...payload } : l)));
+    try { await logsApi.update(log.id, payload); } catch { load(); }
+  };
+
+  const handleLogEditKey = (e, log) => {
+    if (e.key === "Enter") { e.preventDefault(); commitLogEdit(log); }
+    if (e.key === "Escape") setEditingLogId(null);
   };
 
   const byDate = logs.reduce((acc, l) => { (acc[l.date] = acc[l.date] || []).push(l); return acc; }, {});
@@ -302,18 +354,37 @@ export default function Log() {
                 </button>
                 {isExpanded && (
                   <div className="border-t border-border px-3 py-2 overflow-x-auto">
-                    {byDate[d].map((l) => (
+                    {byDate[d].map((l) => {
+                      const isEditing = editingLogId === l.id;
+                      return (
                       <div key={l.id}
-                        className="flex items-center gap-2 sm:gap-3 py-1.5 px-2 rounded row-hover text-sm min-w-[560px]"
+                        className="flex items-center gap-2 sm:gap-3 py-1.5 px-2 rounded row-hover text-sm min-w-[580px]"
                       >
                         <span className="chip shrink-0 text-[11px]">{l.activity}</span>
                         <span className="chip mono shrink-0 text-[11px]">{l.subject}</span>
-                        <span className="text-[12px] text-[hsl(var(--fg-muted))] truncate flex-1 min-w-0" title={l.remarks}>{l.topic || l.remarks || "—"}</span>
-                        <span className="mono text-[11px] flex items-center gap-1 shrink-0 w-[70px]"><Clock className="w-3 h-3 text-[hsl(var(--fg-subtle))]" />{fmtDuration(l.duration_min)}</span>
-                        <span className="mono text-[11px] text-[hsl(var(--fg-muted))] shrink-0 w-[40px] text-right">{l.questions_attempted ? `${l.questions_correct}/${l.questions_attempted}` : "—"}</span>
+                        {isEditing && editingLogField === "remarks" ? (
+                          <input ref={editInputRef} autoFocus value={editingLogVal} onChange={(e) => setEditingLogVal(e.target.value)} onBlur={() => commitLogEdit(l)} onKeyDown={(e) => handleLogEditKey(e, l)} className="input h-6 text-[11px] flex-1 min-w-0" />
+                        ) : (
+                          <span onClick={() => startLogEdit(l, "remarks")} className="text-[12px] text-[hsl(var(--fg-muted))] truncate flex-1 min-w-0 cursor-pointer hover:text-[hsl(var(--accent))] transition-colors" title={l.remarks || "Click to edit remarks"}>{l.remarks || l.topic || "—"}</span>
+                        )}
+                        {isEditing && editingLogField === "duration_min" ? (
+                          <input ref={editInputRef} autoFocus value={editingLogVal} onChange={(e) => setEditingLogVal(e.target.value)} onBlur={() => commitLogEdit(l)} onKeyDown={(e) => handleLogEditKey(e, l)} className="input h-6 text-[11px] w-16 mono text-center" />
+                        ) : (
+                          <span onClick={() => startLogEdit(l, "duration_min")} className="mono text-[11px] flex items-center gap-1 shrink-0 w-[70px] cursor-pointer hover:text-[hsl(var(--accent))] transition-colors" title="Click to edit duration"><Clock className="w-3 h-3 text-[hsl(var(--fg-subtle))]" />{fmtDuration(l.duration_min)}</span>
+                        )}
+                        {isEditing && editingLogField === "questions" ? (
+                          <span className="mono text-[11px] shrink-0 w-[60px] text-right flex items-center gap-1">
+                            <input ref={editInputRef} autoFocus value={editingLogVal} onChange={(e) => setEditingLogVal(e.target.value)} onBlur={() => commitLogEdit(l)} onKeyDown={(e) => handleLogEditKey(e, l)} className="input h-6 text-[11px] w-16 mono text-center" placeholder="12/30" />
+                          </span>
+                        ) : (
+                          <span onClick={() => startLogEdit(l, "questions")} className="mono text-[11px] text-[hsl(var(--fg-muted))] shrink-0 w-[60px] text-right cursor-pointer hover:text-[hsl(var(--accent))] transition-colors" title="Click to edit (format: correct/total)">
+                            {l.questions_attempted ? `${l.questions_correct || 0}/${l.questions_attempted}` : "—"}
+                          </span>
+                        )}
                         <button type="button" onClick={() => remove(l.id)} className="btn-ghost p-1 text-[hsl(var(--danger))] shrink-0"><Trash2 className="w-3 h-3" /></button>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
