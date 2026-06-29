@@ -57,35 +57,23 @@ REVISIT_TYPES = [
 ]
 
 
-class Lecture(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    subject: str
-    topic: str = ""
-    lecture_name: str = ""
-    lecture_number: str = ""
-    duration_min: int = 0
-    completion_percent: int = 0
-    notes_done: bool = False
-    revision_done: bool = False
-    created_at: str = Field(default_factory=now_iso)
-    updated_at: str = Field(default_factory=now_iso)
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
-class SubjectCompletion(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    subject: str
-    topic: str = ""
-    lectures_completed: bool = False
-    notes_created: bool = False
-    flashcards_created: bool = False
-    pyqs_completed: bool = False
-    revision_completed: bool = False
-    subject_test_completed: bool = False
-    dpp_completed: bool = False
-    weekly_quiz_completed: bool = False
-    can_explain_without_notes: bool = False
-    created_at: str = Field(default_factory=now_iso)
-    updated_at: str = Field(default_factory=now_iso)
+def today_iso() -> str:
+    return date.today().isoformat()
+
+
+def add_days(iso_date: str, days: int) -> str:
+    d = datetime.strptime(iso_date, "%Y-%m-%d").date()
+    return (d + timedelta(days=days)).isoformat()
+
+
+def strip_id(d):
+    if d and "_id" in d:
+        d.pop("_id")
+    return d
 
 
 def _compute_subject_completion(checklist: dict) -> dict:
@@ -115,23 +103,35 @@ def _compute_subject_completion(checklist: dict) -> dict:
     }
 
 
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+class Lecture(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    subject: str
+    topic: str = ""
+    lecture_name: str = ""
+    lecture_number: str = ""
+    duration_min: int = 0
+    completion_percent: int = 0
+    notes_done: bool = False
+    revision_done: bool = False
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
 
 
-def today_iso() -> str:
-    return date.today().isoformat()
-
-
-def add_days(iso_date: str, days: int) -> str:
-    d = datetime.strptime(iso_date, "%Y-%m-%d").date()
-    return (d + timedelta(days=days)).isoformat()
-
-
-def strip_id(d):
-    if d and "_id" in d:
-        d.pop("_id")
-    return d
+class SubjectCompletion(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    subject: str
+    topic: str = ""
+    lectures_completed: bool = False
+    notes_created: bool = False
+    flashcards_created: bool = False
+    pyqs_completed: bool = False
+    revision_completed: bool = False
+    subject_test_completed: bool = False
+    dpp_completed: bool = False
+    weekly_quiz_completed: bool = False
+    can_explain_without_notes: bool = False
+    created_at: str = Field(default_factory=now_iso)
+    updated_at: str = Field(default_factory=now_iso)
 
 
 # ============================== MODELS ==============================

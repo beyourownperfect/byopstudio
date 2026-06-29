@@ -12,6 +12,9 @@
 # architecture
 - Keep implementations minimal and avoid over-engineering — prefer simple solutions (e.g., paste-to-markdown conversion) over rich/WYSIWYG editing experiences. Do not add features beyond what is explicitly requested. Confidence: 0.80
 
+# python
+- Define all helper functions before Model classes that reference them via `default_factory` or similar — Python requires the callable to exist at class definition time. Confidence: 0.70
+
 # design
 - Maintain the minimal neo-brutalist aesthetic — clean spacing, strong borders, dark mode, no excessive ornamentation. Confidence: 0.65
 - Avoid overcrowding the UI; use Tailwind responsive classes properly and include smooth hover states, transitions, and animated switching. Confidence: 0.70
