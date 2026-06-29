@@ -14,36 +14,16 @@ import HelpButton from "@/components/HelpButton";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
 // --- small helpers reused by RepoRow ---
-function escapeRx(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function stripMarkdown(text) {
-  return text
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/`([^`]+)`/g, '$1')
-    .replace(/_([^_]+)_/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    .replace(/[#>~|]/g, '');
-}
 
 function HighlightedStatement({ statement, search }) {
-  const display = statement.length > 150 ? statement.slice(0, 150) + "…" : statement;
-  if (!search) {
-    return <MarkdownRenderer>{display}</MarkdownRenderer>;
-  }
-  const clean = stripMarkdown(display);
-  const parts = clean.split(new RegExp(`(${escapeRx(search.trim())})`, 'gi'));
-  return (
-    <span className="text-[13px] leading-snug">
-      {parts.map((part, i) =>
-        i % 2 === 1
-          ? <mark key={i} className="bg-[hsl(var(--warning))]/25 text-[hsl(var(--fg))] rounded-sm px-0.5">{part}</mark>
-          : part
-      )}
-    </span>
-  );
+  // Always render via MarkdownRenderer so LaTeX ($...$, $$...$$) and Markdown display correctly.
+  // Search already filters which rows appear; in-row highlighting is secondary.
+  // Truncate at a safe boundary to avoid cutting mid-LaTeX or mid-tag.
+  const maxLen = 180;
+  const display = statement.length > maxLen
+    ? statement.slice(0, maxLen).replace(/\$\$?[^$]*$/, "").replace(/```[\s\S]*$/, "").trim() + "…"
+    : statement;
+  return <MarkdownRenderer>{display}</MarkdownRenderer>;
 }
 
 function RevBadge({ date }) {

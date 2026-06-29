@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Plus, Trash2, Clock, Play, Pause, Square, ChevronDown, BookOpen, CheckCircle, ListChecks, Edit3, X as XIcon } from "lucide-react";
+import { Plus, Trash2, Clock, Play, Pause, Square, ChevronDown, BookOpen, CheckCircle, X as XIcon } from "lucide-react";
 import { logsApi, lecturesApi, subjectCompletionApi } from "@/lib/api";
 import { SUBJECTS, ACTIVITIES, TID } from "@/lib/constants";
 import { todayISO, fmtDate, fmtDuration, isoAdd } from "@/lib/dateUtils";
@@ -64,13 +64,9 @@ export default function Log() {
   const [completions, setCompletions] = useState([]);
   const [lectureExpanded, setLectureExpanded] = useState(false);
   const [completionExpanded, setCompletionExpanded] = useState(false);
-  const [lectureFormOpen, setLectureFormOpen] = useState(false);
-  const [lectureEdit, setLectureEdit] = useState(null);
   const [lectureViewSubject, setLectureViewSubject] = useState("ALL");
   const [completionSubject, setCompletionSubject] = useState("ALL");
   const [expandedSubjects, setExpandedSubjects] = useState({});
-  const emptyLecture = { subject: "OS", topic: "", lecture_name: "", lecture_number: "", duration_min: 0, completion_percent: 0, notes_done: false, revision_done: false };
-  const [lectureForm, setLectureForm] = useState(emptyLecture);
 
   const load = async () => {
     let start;
@@ -98,23 +94,6 @@ export default function Log() {
   useEffect(() => {
     if (completionExpanded && completions.length === 0) loadCompletions();
   }, [completionExpanded]); // eslint-disable-line
-
-  const openLectureForm = (l) => {
-    if (l) { setLectureEdit(l); setLectureForm({ ...l }); }
-    else { setLectureEdit(null); setLectureForm(emptyLecture); }
-    setLectureFormOpen(true);
-  };
-
-  const setLec = (k, v) => setLectureForm((f) => ({ ...f, [k]: v }));
-
-  const saveLecture = async () => {
-    const payload = { ...lectureForm, completion_percent: Number(lectureForm.completion_percent), duration_min: Number(lectureForm.duration_min) };
-    if (lectureEdit) await lecturesApi.update(lectureEdit.id, payload);
-    else await lecturesApi.create(payload);
-    setLectureFormOpen(false);
-    setLectureEdit(null);
-    loadLectures();
-  };
 
   const deleteLecture = async (id) => {
     if (!window.confirm("Delete this lecture?")) return;
@@ -304,7 +283,13 @@ export default function Log() {
                 <option value="ALL">All subjects</option>
                 {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
-              <button onClick={() => openLectureForm(null)} className="btn btn-primary text-xs"><Plus className="w-3 h-3" /> New lecture</button>
+              <button
+                onClick={async () => {
+                  await lecturesApi.create({ subject: lectureViewSubject === "ALL" ? "OS" : lectureViewSubject, topic: "", lecture_name: "", lecture_number: "", duration_min: 0, completion_percent: 0, notes_done: false, revision_done: false });
+                  loadLectures();
+                }}
+                className="btn btn-primary text-xs"
+              ><Plus className="w-3 h-3" /> New lecture</button>
             </div>
 
             {lectures.length === 0 ? (
@@ -314,9 +299,10 @@ export default function Log() {
                 lectures={lectures.filter((l) => lectureViewSubject === "ALL" || l.subject === lectureViewSubject)}
                 expandedSubjects={expandedSubjects}
                 onToggleSubject={toggleSubjectExpand}
-                onEdit={openLectureForm}
                 onDelete={deleteLecture}
                 onToggleField={toggleLectureField}
+                onRefresh={loadLectures}
+                lecturesApi={lecturesApi}
               />
             )}
           </div>
@@ -434,32 +420,6 @@ export default function Log() {
           <div><label className="label-x">Remarks / Journal</label><textarea value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} className="input mt-1 min-h-[60px]" placeholder="One or two lines — what was hard, what clicked, what to revisit." /></div>
         </div>
       </Modal>
-
-      {/* ==== Lecture form modal ==== */}
-      <Modal open={lectureFormOpen} onClose={() => setLectureFormOpen(false)} title={lectureEdit ? "Edit lecture" : "New lecture"} size="md"
-        footer={
-          <>
-            <button onClick={() => setLectureFormOpen(false)} className="btn">Cancel</button>
-            <button onClick={saveLecture} className="btn btn-primary">Save</button>
-          </>
-        }>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="label-x">Subject</label><select value={lectureForm.subject} onChange={(e) => setLec("subject", e.target.value)} className="input mt-1">{SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
-            <div><label className="label-x">Topic</label><input value={lectureForm.topic} onChange={(e) => setLec("topic", e.target.value)} className="input mt-1" placeholder="e.g. Trees" /></div>
-          </div>
-          <div><label className="label-x">Lecture name</label><input value={lectureForm.lecture_name} onChange={(e) => setLec("lecture_name", e.target.value)} className="input mt-1" placeholder="e.g. Binary Search Trees" /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="label-x">Number (e.g. 12/42)</label><input value={lectureForm.lecture_number} onChange={(e) => setLec("lecture_number", e.target.value)} className="input mt-1" placeholder="12/42" /></div>
-            <div><label className="label-x">Duration (min)</label><input type="number" value={lectureForm.duration_min} onChange={(e) => setLec("duration_min", e.target.value)} className="input mt-1" /></div>
-          </div>
-          <div><label className="label-x">Completion %</label><input type="number" min="0" max="100" value={lectureForm.completion_percent} onChange={(e) => setLec("completion_percent", e.target.value)} className="input mt-1" /></div>
-          <div className="flex items-center gap-4">
-            <label className="inline-flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={lectureForm.notes_done} onChange={(e) => setLec("notes_done", e.target.checked)} className="accent-[hsl(var(--accent))]" />Notes done</label>
-            <label className="inline-flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={lectureForm.revision_done} onChange={(e) => setLec("revision_done", e.target.checked)} className="accent-[hsl(var(--accent))]" />Revision done</label>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }
@@ -475,19 +435,59 @@ function SumCard({ label, value }) {
   );
 }
 
-/* ── Lecture Table (tabular, grouped by Subject → Topic, collapsible) ── */
+/* ── Lecture Table (tabular, grouped by Subject → Topic, collapsible, inline-editable) ── */
 
-const LECTURE_COLUMNS = [
-  { key: "lecture_name", label: "Name", flex: "2" },
-  { key: "lecture_number", label: "#", flex: "0.6" },
-  { key: "completion_percent", label: "Progress", flex: "1.2" },
-  { key: "notes_done", label: "N", flex: "0.4" },
-  { key: "revision_done", label: "R", flex: "0.4" },
-  { key: "duration_min", label: "Duration", flex: "0.8" },
-  { key: "actions", label: "", flex: "0.3" },
-];
+function parseLecturePct(numStr) {
+  if (!numStr) return null;
+  const m = String(numStr).match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (m) {
+    const done = parseInt(m[1], 10);
+    const total = parseInt(m[2], 10);
+    return total > 0 ? Math.round((done / total) * 100) : null;
+  }
+  return null;
+}
 
-function LectureTable({ lectures, expandedSubjects, onToggleSubject, onEdit, onDelete, onToggleField }) {
+function LectureTable({ lectures, expandedSubjects, onToggleSubject, onDelete, onToggleField, onRefresh, lecturesApi }) {
+  const [editing, setEditing] = useState(null); // { id, field }
+  const [editVal, setEditVal] = useState("");
+
+  const startEdit = (l, field) => {
+    setEditing({ id: l.id, field });
+    setEditVal(field === "duration_min" ? String(l[field] || "") : String(l[field] ?? ""));
+  };
+
+  const commitEdit = async (l) => {
+    if (!editing) return;
+    const { field } = editing;
+    const trimmed = editVal.trim();
+    if (trimmed === String(l[field] ?? "")) { setEditing(null); return; }
+
+    const payload = {};
+    if (field === "duration_min") {
+      payload.duration_min = parseInt(trimmed, 10) || 0;
+    } else if (field === "completion_percent") {
+      payload.completion_percent = Math.min(100, Math.max(0, parseInt(trimmed, 10) || 0));
+    } else if (field === "lecture_number") {
+      payload.lecture_number = trimmed;
+      const pct = parseLecturePct(trimmed);
+      if (pct !== null) payload.completion_percent = pct;
+    } else if (field === "topic") {
+      payload.topic = trimmed;
+    } else {
+      payload[field] = trimmed;
+    }
+
+    setEditing(null);
+    await lecturesApi.update(l.id, payload);
+    onRefresh();
+  };
+
+  const handleKey = (e, l) => {
+    if (e.key === "Enter") commitEdit(l);
+    if (e.key === "Escape") setEditing(null);
+  };
+
   const grouped = {};
   for (const l of lectures) {
     const subj = l.subject || "?";
@@ -519,38 +519,137 @@ function LectureTable({ lectures, expandedSubjects, onToggleSubject, onEdit, onD
               </div>
               <span className="text-[10px] mono text-[hsl(var(--fg-muted))]">{pct}%</span>
             </button>
-            {isExpanded && lecs.map((l) => (
-              <div key={l.id}
-                className="flex items-center gap-2 sm:gap-3 px-4 py-1.5 hover:bg-[hsl(var(--bg-elev))]/60 transition-colors text-[12px] group"
-              >
-                <span className="w-5 shrink-0" />
-                <span className="text-[11px] text-[hsl(var(--fg-muted))] truncate max-w-[100px] hidden sm:inline">{l.topic || "General"}</span>
-                <button onClick={() => onEdit(l)}
-                  className="text-left truncate flex-[2] min-w-0 hover:text-[hsl(var(--accent))] transition-colors"
+            {isExpanded && lecs.map((l) => {
+              const isEditing = editing?.id === l.id;
+              return (
+                <div key={l.id}
+                  className="flex items-center gap-2 sm:gap-3 px-4 py-1.5 hover:bg-[hsl(var(--bg-elev))]/60 transition-colors text-[12px] group"
                 >
-                  {l.lecture_name || "Unnamed"}
-                </button>
-                <span className="text-[10px] text-[hsl(var(--fg-subtle))] flex-[0.6] text-right mono">{l.lecture_number || "—"}</span>
-                <div className="flex-[1.2] flex items-center gap-1.5">
-                  <div className="flex-1 h-1 bg-[hsl(var(--bg-elev-2))] rounded-full overflow-hidden max-w-[50px]">
-                    <div className={`h-full rounded-full transition-all duration-300 ${l.completion_percent >= 100 ? "bg-[hsl(var(--success))]" : "bg-[hsl(var(--warning))]"}`} style={{ width: `${Math.min(100, l.completion_percent)}%` }} />
+                  <span className="w-5 shrink-0" />
+                  {/* Topic — click to edit */}
+                  {isEditing && editing.field === "topic" ? (
+                    <input
+                      autoFocus
+                      value={editVal}
+                      onChange={(e) => setEditVal(e.target.value)}
+                      onBlur={() => commitEdit(l)}
+                      onKeyDown={(e) => handleKey(e, l)}
+                      className="input h-6 text-[11px] max-w-[100px] hidden sm:inline"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => startEdit(l, "topic")}
+                      className="text-[11px] text-[hsl(var(--fg-muted))] truncate max-w-[100px] hidden sm:inline text-left hover:text-[hsl(var(--fg))] transition-colors"
+                      title="Click to edit topic"
+                    >
+                      {l.topic || "General"}
+                    </button>
+                  )}
+
+                  {/* Name — click to edit */}
+                  {isEditing && editing.field === "lecture_name" ? (
+                    <input
+                      autoFocus
+                      value={editVal}
+                      onChange={(e) => setEditVal(e.target.value)}
+                      onBlur={() => commitEdit(l)}
+                      onKeyDown={(e) => handleKey(e, l)}
+                      className="input h-6 text-[12px] flex-[2] min-w-0"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => startEdit(l, "lecture_name")}
+                      className="text-left truncate flex-[2] min-w-0 hover:text-[hsl(var(--accent))] transition-colors"
+                      title="Click to edit name"
+                    >
+                      {l.lecture_name || "Unnamed"}
+                    </button>
+                  )}
+
+                  {/* Number — click to edit (auto-populates completion %) */}
+                  {isEditing && editing.field === "lecture_number" ? (
+                    <input
+                      autoFocus
+                      value={editVal}
+                      onChange={(e) => setEditVal(e.target.value)}
+                      onBlur={() => commitEdit(l)}
+                      onKeyDown={(e) => handleKey(e, l)}
+                      className="input h-6 w-14 text-[10px] mono text-center"
+                      placeholder="1/10"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => startEdit(l, "lecture_number")}
+                      className="text-[10px] text-[hsl(var(--fg-subtle))] flex-[0.6] text-right mono hover:text-[hsl(var(--fg))] transition-colors"
+                      title="Click to edit (e.g. 12/42 — auto-calculates completion %)"
+                    >
+                      {l.lecture_number || "—"}
+                    </button>
+                  )}
+
+                  {/* Progress — click to edit, or click number to auto-calc */}
+                  <div className="flex-[1.2] flex items-center gap-1.5">
+                    <div className="flex-1 h-1 bg-[hsl(var(--bg-elev-2))] rounded-full overflow-hidden max-w-[50px]">
+                      <div className={`h-full rounded-full transition-all duration-300 ${l.completion_percent >= 100 ? "bg-[hsl(var(--success))]" : "bg-[hsl(var(--warning))]"}`} style={{ width: `${Math.min(100, l.completion_percent || 0)}%` }} />
+                    </div>
+                    {isEditing && editing.field === "completion_percent" ? (
+                      <input
+                        autoFocus
+                        value={editVal}
+                        onChange={(e) => setEditVal(e.target.value)}
+                        onBlur={() => commitEdit(l)}
+                        onKeyDown={(e) => handleKey(e, l)}
+                        className="input h-6 w-9 text-[10px] mono text-center"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => startEdit(l, "completion_percent")}
+                        className="text-[10px] mono text-[hsl(var(--fg-muted))] w-6 text-right hover:text-[hsl(var(--fg))] transition-colors"
+                        title="Click to edit directly (or edit lecture number to auto-calc)"
+                      >
+                        {l.completion_percent ?? 0}%
+                      </button>
+                    )}
                   </div>
-                  <span className="text-[10px] mono text-[hsl(var(--fg-muted))] w-6 text-right">{l.completion_percent}%</span>
+
+                  {/* Notes toggle */}
+                  <button onClick={() => onToggleField(l, "notes_done")}
+                    className={`flex-[0.4] text-[10px] w-7 h-5 rounded border transition-colors flex items-center justify-center ${l.notes_done ? "border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]" : "border-border text-[hsl(var(--fg-subtle))] hover:border-[hsl(var(--accent))]"}`}
+                    title="Notes"
+                  >{l.notes_done ? "✓" : "—"}</button>
+
+                  {/* Revision toggle */}
+                  <button onClick={() => onToggleField(l, "revision_done")}
+                    className={`flex-[0.4] text-[10px] w-7 h-5 rounded border transition-colors flex items-center justify-center ${l.revision_done ? "border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]" : "border-border text-[hsl(var(--fg-subtle))] hover:border-[hsl(var(--accent))]"}`}
+                    title="Revision"
+                  >{l.revision_done ? "✓" : "—"}</button>
+
+                  {/* Duration — click to edit */}
+                  {isEditing && editing.field === "duration_min" ? (
+                    <input
+                      autoFocus
+                      value={editVal}
+                      onChange={(e) => setEditVal(e.target.value)}
+                      onBlur={() => commitEdit(l)}
+                      onKeyDown={(e) => handleKey(e, l)}
+                      className="input h-6 w-12 text-[10px] mono text-center"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => startEdit(l, "duration_min")}
+                      className="text-[10px] mono text-[hsl(var(--fg-muted))] flex-[0.8] text-right hover:text-[hsl(var(--fg))] transition-colors"
+                      title="Click to edit duration (min)"
+                    >
+                      {l.duration_min ? fmtDuration(l.duration_min) : "—"}
+                    </button>
+                  )}
+
+                  <div className="flex-[0.3] flex justify-end">
+                    <button onClick={() => onDelete(l.id)} className="btn-ghost p-0.5 text-[hsl(var(--danger))] opacity-0 group-hover:opacity-100 transition-opacity" title="Delete"><Trash2 className="w-3 h-3" /></button>
+                  </div>
                 </div>
-                <button onClick={() => onToggleField(l, "notes_done")}
-                  className={`flex-[0.4] text-[10px] w-7 h-5 rounded border transition-colors flex items-center justify-center ${l.notes_done ? "border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]" : "border-border text-[hsl(var(--fg-subtle))] hover:border-[hsl(var(--accent))]"}`}
-                  title="Notes"
-                >{l.notes_done ? "✓" : "—"}</button>
-                <button onClick={() => onToggleField(l, "revision_done")}
-                  className={`flex-[0.4] text-[10px] w-7 h-5 rounded border transition-colors flex items-center justify-center ${l.revision_done ? "border-[hsl(var(--success))]/40 bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]" : "border-border text-[hsl(var(--fg-subtle))] hover:border-[hsl(var(--accent))]"}`}
-                  title="Revision"
-                >{l.revision_done ? "✓" : "—"}</button>
-                <span className="text-[10px] mono text-[hsl(var(--fg-muted))] flex-[0.8] text-right">{l.duration_min ? fmtDuration(l.duration_min) : "—"}</span>
-                <div className="flex-[0.3] flex justify-end">
-                  <button onClick={() => onDelete(l.id)} className="btn-ghost p-0.5 text-[hsl(var(--danger))] opacity-0 group-hover:opacity-100 transition-opacity" title="Delete"><Trash2 className="w-3 h-3" /></button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         );
       })}

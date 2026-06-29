@@ -6,6 +6,8 @@ import { TID } from "@/lib/constants";
 import { relLabel } from "@/lib/dateUtils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
+import HelpButton from "@/components/HelpButton";
+import { HELP_CONTENT } from "@/lib/helpContent";
 
 export default function Bookmarks() {
   const navigate = useNavigate();
@@ -30,7 +32,10 @@ export default function Bookmarks() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold">Bookmarks</h1>
+        <h1 className="text-xl font-semibold flex items-center gap-2">
+          <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" /> Bookmarks
+          <HelpButton moduleKey="bookmarks" title="Bookmarks" sections={HELP_CONTENT.bookmarks?.sections || [{ title: "Starred", body: "Questions you've bookmarked from Repository or Practice appear here." }]} />
+        </h1>
         <p className="text-xs text-[hsl(var(--fg-muted))]">Important questions you starred · {items.length} items</p>
       </div>
 
@@ -57,12 +62,12 @@ export default function Bookmarks() {
                   <span>Next review: {q.next_revision_date ? relLabel(q.next_revision_date) : "—"}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 <button onClick={() => toggleBookmark(q)} className="btn-ghost p-1.5">
                   <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                 </button>
                 <RevisitMenu itemType="question" itemId={q.id} itemTitle={q.statement.slice(0, 60)} itemSubject={q.subject} compact />
-                <button onClick={() => navigate(`/solve/practice?question=${q.id}`)} className="btn"><Play className="w-3.5 h-3.5" /> Practice</button>
+                <button onClick={() => navigate(`/solve/practice?question=${q.id}`)} className="btn btn-primary"><Play className="w-3.5 h-3.5" /> Practice</button>
                 {q.gateoverflow_url && (
                   <a href={q.gateoverflow_url} target="_blank" rel="noreferrer" className="btn-ghost p-1.5"><ExternalLink className="w-4 h-4" /></a>
                 )}

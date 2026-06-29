@@ -158,7 +158,7 @@ export default function Practice() {
 
   if (!q) {
     return (
-      <div className="card-2 p-8 text-center max-w-md mx-auto mt-12">
+      <div className="card-2 p-12 text-center max-w-md mx-auto mt-12">
         <p className="font-semibold mb-2">Nothing to practice here.</p>
         <p className="text-xs text-[hsl(var(--fg-muted))] mb-4">Try a different mode or filter.</p>
         <button onClick={() => { setStarted(false); setExcludeIds([]); navigate("/solve/practice"); }} className="btn">Change mode</button>

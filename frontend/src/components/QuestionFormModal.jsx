@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Wand2 } from "lucide-react";
 import Modal from "@/components/Modal";
 import { SUBJECTS, QUESTION_TYPES, DIFFICULTIES, EXAM_SOURCES, TID } from "@/lib/constants";
 import { questionsApi } from "@/lib/api";
@@ -10,9 +11,118 @@ const empty = {
   gateoverflow_url: "", exam_source: "GATE", exam_source_other: "", year: "", difficulty: "Medium", bookmarked: false, notes: "",
 };
 
+/* ── OCR section parser ── */
+
+const SECTION_RE = /^#{1,3}\s*(question|options|custom options|correct answer|explanation)\s*$/i;
+
+function guessTypeFromOptions(opts) {
+  const lines = opts.filter((o) => o.trim() !== "");
+  if (lines.length === 0) return null;
+  // Multi-select: comma-separated letters like A,C,D
+  if (/^[A-D](,[A-D])+$/.test(lines[0].trim())) return "MSQ";
+  // NAT: answer looks like a number (integer or decimal)
+  if (/^\d+(\.\d+)?$/.test(lines[0].trim())) return "NAT";
+  return "MCQ";
+}
+
+function parseOcrSections(raw) {
+  const text = raw.replace(/\r\n?/g, "\n");
+  const lines = text.split("\n");
+  const sections = {};
+  let currentSection = null;
+  let currentContent = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const m = line.match(SECTION_RE);
+    if (m) {
+      if (currentSection) sections[currentSection] = currentContent.join("\n").trim();
+      currentSection = m[1].toLowerCase().replace(/\s+/g, "_");
+      currentContent = [];
+    } else {
+      if (currentSection) currentContent.push(line);
+      else currentContent.push(line);
+    }
+  }
+  if (currentSection) sections[currentSection] = currentContent.join("\n").trim();
+
+  return sections;
+}
+
+function parseOptionsBlock(raw) {
+  if (!raw) return [];
+  const lines = raw.trim().split("\n");
+  const opts = [];
+  let buf = "";
+  let inFence = false;
+  const fenceLines = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      if (inFence) {
+        inFence = false;
+        buf += "\n" + fenceLines.join("\n") + "\n```";
+        fenceLines.length = 0;
+        continue;
+      }
+      inFence = true;
+      fenceLines.push(line);
+      continue;
+    }
+    if (inFence) { fenceLines.push(line); continue; }
+
+    // Detect option markers: A), A., [A], (A), A:, A   or   (a)  a)  etc.
+    const optMatch = trimmed.match(/^[\[(]?([A-D])[\])]?[.)]?\s/);
+    if (optMatch) {
+      if (buf.trim()) { opts.push(buf.trim()); buf = ""; }
+      opts.push(trimmed);
+    } else {
+      if (buf) buf += "\n" + line;
+      else buf = line;
+    }
+  }
+  if (buf.trim()) opts.push(buf.trim());
+  return opts;
+}
+
+function parseCorrectAnswer(raw) {
+  if (!raw) return "";
+  const t = raw.trim();
+  // Strip markers like "Answer:" or "Correct:"
+  const cleaned = t.replace(/^(answer|correct|correct answer)\s*:?\s*/i, "").trim();
+  return cleaned;
+}
+
+/* ── Toast (lightweight inline, no external dep) ── */
+
+function useToast() {
+  const [toast, setToast] = useState(null);
+  const show = (msg, kind = "success") => {
+    setToast({ msg, kind });
+    setTimeout(() => setToast(null), 3000);
+  };
+  return { toast, show };
+}
+
+function Toast({ toast }) {
+  if (!toast) return null;
+  return (
+    <div className={`fixed bottom-4 right-4 z-50 px-4 py-2 rounded border-2 text-sm font-medium shadow-lg transition-all animate-modal-in ${
+      toast.kind === "error" ? "bg-[hsl(var(--danger))]/10 border-[hsl(var(--danger))] text-[hsl(var(--danger))]" : "bg-[hsl(var(--success))]/10 border-[hsl(var(--success))] text-[hsl(var(--success))]"
+    }`}>
+      {toast.msg}
+    </div>
+  );
+}
+
+/* ── Component ── */
+
 export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
   const [form, setForm] = useState(empty);
+  const [ocrText, setOcrText] = useState("");
   const { onPaste } = usePasteMarkdown();
+  const { toast, show } = useToast();
 
   useEffect(() => {
     if (editing) {
@@ -37,6 +147,40 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
     opts[i] = v;
     return { ...f, options: opts };
   });
+
+  const autoFill = () => {
+    const raw = ocrText.trim();
+    if (!raw) { show("Paste OCR output first", "error"); return; }
+    const sections = parseOcrSections(raw);
+    const updated = { ...form };
+    let filled = 0;
+
+    if (sections.question) {
+      updated.statement = sections.question;
+      filled++;
+    }
+    if (sections.options) {
+      const opts = parseOptionsBlock(sections.options);
+      if (opts.length > 0) {
+        updated.options = opts;
+        const guessed = guessTypeFromOptions(opts);
+        if (guessed) updated.question_type = guessed;
+        filled++;
+      }
+    }
+    if (sections.correct_answer) {
+      updated.correct_answer = parseCorrectAnswer(sections.correct_answer);
+      filled++;
+    }
+    if (sections.explanation) {
+      updated.explanation = sections.explanation;
+      filled++;
+    }
+
+    setForm(updated);
+    if (filled > 0) show(`Filled ${filled} field${filled !== 1 ? "s" : ""}`, "success");
+    else show("No recognized sections found. Expected ## Question, ## Options, ## Correct Answer, ## Explanation", "error");
+  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -66,6 +210,20 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
       }
     >
       <form onSubmit={onSubmit} className="space-y-4">
+        {/* OCR Auto Fill */}
+        <div className="card-1 p-3 space-y-2">
+          <label className="label-x">Paste OCR output</label>
+          <textarea
+            value={ocrText}
+            onChange={(e) => setOcrText(e.target.value)}
+            className="input min-h-[80px] text-xs mono"
+            placeholder={`## Question\nWhat is the time complexity of binary search?\n\n## Options\nA) O(1)\nB) O(log n)\nC) O(n)\nD) O(n log n)\n\n## Correct Answer\nB\n\n## Explanation\nBinary search halves the search space each iteration.`}
+          />
+          <button type="button" onClick={autoFill} className="btn text-xs flex items-center gap-1.5">
+            <Wand2 className="w-3.5 h-3.5" /> Auto Fill
+          </button>
+        </div>
+
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="label-x">Subject</label>
@@ -167,6 +325,7 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
           Bookmarked
         </label>
       </form>
+      <Toast toast={toast} />
     </Modal>
   );
 }

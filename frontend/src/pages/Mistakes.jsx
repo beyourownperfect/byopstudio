@@ -4,6 +4,8 @@ import { Play, AlertCircle } from "lucide-react";
 import { mistakesApi } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
+import HelpButton from "@/components/HelpButton";
+import { HELP_CONTENT } from "@/lib/helpContent";
 
 const MODES = [
   { value: "all", label: "All wrong" },
@@ -37,7 +39,9 @@ export default function Mistakes() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-xl font-semibold flex items-center gap-2"><AlertCircle className="w-5 h-5 text-[hsl(var(--danger))]" /> Mistakes Bank</h1>
+          <h1 className="text-xl font-semibold flex items-center gap-2"><AlertCircle className="w-5 h-5 text-[hsl(var(--danger))]" /> Mistakes Bank
+            <HelpButton moduleKey="mistakes" title="Mistakes" sections={HELP_CONTENT.mistakes?.sections || [{ title: "Wrong answers", body: "Every question you answered incorrectly, organized by recency and frequency." }]} />
+          </h1>
           <p className="text-xs text-[hsl(var(--fg-muted))]">Where you slipped · {items.length} questions</p>
         </div>
         <div className="flex items-center gap-2">
@@ -64,9 +68,9 @@ export default function Mistakes() {
                 <div className="text-sm leading-snug line-clamp-2"><MarkdownRenderer>{q.statement}</MarkdownRenderer></div>
                 <div className="mt-1 text-[11px] text-[hsl(var(--fg-muted))]">{q.topic || "—"} · {q.question_type}</div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 <RevisitMenu itemType="question" itemId={q.id} itemTitle={q.statement.slice(0, 60)} itemSubject={q.subject} compact />
-                <button onClick={() => navigate(`/solve/practice?question=${q.id}`)} className="btn"><Play className="w-3.5 h-3.5" /> Solve</button>
+                <button onClick={() => navigate(`/solve/practice?question=${q.id}`)} className="btn btn-primary"><Play className="w-3.5 h-3.5" /> Solve</button>
               </div>
             </div>
           ))}
