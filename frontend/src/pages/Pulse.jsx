@@ -7,6 +7,7 @@ import { fmtDateLong } from "@/lib/dateUtils";
 import HelpButton from "@/components/HelpButton";
 import MissionCard from "@/components/MissionCard";
 import LectureTable from "@/components/LectureTable";
+import StudyTimer from "@/components/StudyTimer";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
 const MOMENTUM_COLORS = (n) =>
@@ -38,17 +39,20 @@ export default function Pulse() {
 
   if (!data) {
     return (
-      <div className="space-y-4">
-        <div className="skeleton h-32" />
-        <div className="grid grid-cols-3 gap-4">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-24" />)}</div>
+      <div className="space-y-6">
+        <div className="card-2 p-5"><div className="skeleton h-10" /></div>
+        <div className="space-y-4">
+          <div className="skeleton h-32" />
+          <div className="grid grid-cols-3 gap-4">{[...Array(3)].map((_, i) => <div key={i} className="skeleton h-24" />)}</div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-end justify-between gap-3 flex-wrap">
+    <div className="space-y-6">
+      {/* ━━━ Header ━━━ */}
+      <div className="card-2 px-5 py-4 flex items-end justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <div>
             <h1 className="text-2xl font-semibold flex items-center gap-2"><Zap className="w-5 h-5 text-[hsl(var(--accent))]" /> Pulse</h1>
@@ -56,7 +60,8 @@ export default function Pulse() {
           </div>
           <HelpButton moduleKey="pulse" title={HELP_CONTENT.pulse.title} sections={HELP_CONTENT.pulse.sections} />
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <StudyTimer />
           <div className="text-right">
             <div className="label-x">GATE in</div>
             <div className="font-semibold mono text-lg">{data.days_until_exam}<span className="text-[hsl(var(--fg-muted))] text-xs ml-1">days</span></div>
@@ -66,32 +71,33 @@ export default function Pulse() {
         </div>
       </div>
 
-      {/* Today's Mission */}
-      <MissionCard />
-
-      {/* Preparation Snapshot */}
-      <PreparationSnapshot snapshot={data.preparation_snapshot} />
-
-      {/* Row: Momentum, Due Today, Today's Progress */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <MomentumCard momentum={data.momentum} delta={data.momentum_delta} sparkline={data.momentum_sparkline} />
-        <DueTodayCard dueRevisions={data.due_revisions} dueRevisits={data.due_revisits} navigate={navigate} />
-        <div className="card-2 p-5">
-          <div className="label-x mb-1">Today&apos;s progress</div>
-          <div className="space-y-2 mt-1">
-            <ProgressLine label="Questions" value={data.today_questions} target={data.targets.daily_question_target} pct={data.daily_q_percent} />
-            <ProgressLine label="Minutes" value={data.today_minutes} target={data.targets.daily_study_minutes_target} pct={data.daily_m_percent} />
+      {/* ━━━ Today ━━━ */}
+      <SectionLabel icon={<Zap className="w-3.5 h-3.5" />} text="Today" />
+      <div className="space-y-4">
+        <MissionCard />
+        <div className="grid md:grid-cols-3 gap-4">
+          <MomentumCard momentum={data.momentum} delta={data.momentum_delta} sparkline={data.momentum_sparkline} />
+          <DueTodayCard dueRevisions={data.due_revisions} dueRevisits={data.due_revisits} navigate={navigate} />
+          <div className="card-2-time p-5">
+            <div className="label-x mb-1">Today&apos;s progress</div>
+            <div className="space-y-2 mt-1">
+              <ProgressLine label="Questions" value={data.today_questions} target={data.targets.daily_question_target} pct={data.daily_q_percent} />
+              <ProgressLine label="Minutes" value={data.today_minutes} target={data.targets.daily_study_minutes_target} pct={data.daily_m_percent} />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Weak Topics */}
-      <WeakTopicsCard weakTopics={data.weak_topics} expanded={weakExpanded} toggle={() => setWeakExpanded(!weakExpanded)} navigate={navigate} />
+      {/* ━━━ Readiness ━━━ */}
+      <SectionLabel icon={<Target className="w-3.5 h-3.5" />} text="Readiness" />
+      <div className="space-y-4">
+        <PreparationSnapshot snapshot={data.preparation_snapshot} />
+        <WeakTopicsCard weakTopics={data.weak_topics} expanded={weakExpanded} toggle={() => setWeakExpanded(!weakExpanded)} navigate={navigate} />
+        <SubjectCompletionCard subjects={sortedSubjects} />
+      </div>
 
-      {/* Subject Completion */}
-      <SubjectCompletionCard subjects={sortedSubjects} />
-
-      {/* Lecture Progress */}
+      {/* ━━━ Lectures ━━━ */}
+      <SectionLabel icon={<BookOpen className="w-3.5 h-3.5" />} text="Lectures" />
       <LectureTable />
 
       {/* Settings modal */}
@@ -116,6 +122,16 @@ export default function Pulse() {
 }
 
 /* ── Sub-components ── */
+
+function SectionLabel({ icon, text }) {
+  return (
+    <div className="flex items-center gap-3 py-1 select-none">
+      <span className="text-[hsl(var(--accent))] flex items-center">{icon}</span>
+      <span className="text-[11px] font-semibold tracking-[0.14em] uppercase text-[hsl(var(--fg-muted))]">{text}</span>
+      <span className="flex-1 border-t border-border ml-1" />
+    </div>
+  );
+}
 
 function StudyStatus({ hasStudy }) {
   return (
@@ -144,7 +160,7 @@ function PreparationSnapshot({ snapshot }) {
     { key: "mock_readiness", label: "Mock Readiness", value: snapshot.mock_tests_exist ? snapshot.mock_readiness : 0, icon: FileText, help: "Log a Mock Test session to unlock", muted: !snapshot.mock_tests_exist },
   ];
   return (
-    <div className="card-2 p-5" data-testid={TID.pulseReadiness}>
+    <div className="card-2-accent p-5" data-testid={TID.pulseReadiness}>
       <div className="flex items-center gap-2 mb-4">
         <Zap className="w-4 h-4 text-[hsl(var(--accent))]" />
         <h3 className="font-semibold text-sm">Preparation Snapshot</h3>

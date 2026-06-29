@@ -9,21 +9,23 @@ import QuestionFormModal from "@/components/QuestionFormModal";
 import QuestionDetailsModal from "@/components/QuestionDetailsModal";
 import OcrPromptModal from "@/components/OcrPromptModal";
 import RevisitMenu from "@/components/RevisitMenu";
-import MarkdownRenderer from "@/components/MarkdownRenderer";
 import HelpButton from "@/components/HelpButton";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
 // --- small helpers reused by RepoRow ---
 
 function HighlightedStatement({ statement, search }) {
-  // Always render via MarkdownRenderer so LaTeX ($...$, $$...$$) and Markdown display correctly.
-  // Search already filters which rows appear; in-row highlighting is secondary.
-  // Truncate at a safe boundary to avoid cutting mid-LaTeX or mid-tag.
-  const maxLen = 180;
-  const display = statement.length > maxLen
-    ? statement.slice(0, maxLen).replace(/\$\$?[^$]*$/, "").replace(/```[\s\S]*$/, "").trim() + "…"
-    : statement;
-  return <MarkdownRenderer>{display}</MarkdownRenderer>;
+  // Render a single-line plaintext preview, stripping Markdown/LaTeX for uniform row height.
+  // Full rendering is in QuestionDetailsModal on click/double-click.
+  const plain = statement
+    .replace(/\$\$?[^$]*\$?\$/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/[*_~`#]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const maxLen = 200;
+  const display = plain.length > maxLen ? plain.slice(0, maxLen).trim() + "…" : plain;
+  return <span className="text-sm whitespace-nowrap">{display}</span>;
 }
 
 function RevBadge({ date }) {

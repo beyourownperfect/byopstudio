@@ -268,7 +268,7 @@ class RevisitItem(BaseModel):
 
 class Settings(BaseModel):
     id: str = "singleton"
-    exam_date: str = "2027-02-13"  # GATE 2027 weekend (default; user editable)
+    exam_date: str = "2027-02-07"  # GATE 2027 weekend (default; user editable)
     daily_question_target: int = 20
     daily_revision_target: int = 10
     daily_study_minutes_target: int = 240
@@ -322,9 +322,18 @@ def _is_question_completed(srs: dict) -> bool:
 async def _get_settings() -> dict:
     s = await db.settings.find_one({"id": "singleton"}, {"_id": 0})
     if s:
+        # Auto-advance exam_date if it's in the past
+        try:
+            if datetime.strptime(s["exam_date"], "%Y-%m-%d").date() < date.today():
+                s["exam_date"] = Settings.model_fields["exam_date"].default
+                await db.settings.update_one(
+                    {"id": "singleton"},
+                    {"$set": {"exam_date": s["exam_date"], "updated_at": now_iso()}}
+                )
+        except (ValueError, KeyError):
+            pass
         return s
     s = Settings().model_dump()
-    # insert_one mutates `s` by adding _id; insert a copy and return the clean dict
     await db.settings.insert_one(dict(s))
     return s
 

@@ -113,17 +113,31 @@
   .card-2 {
     @apply bg-[hsl(var(--bg-elev))] rounded-lg;
     border: 2px solid hsl(var(--border));
+    box-shadow: 0 2px 12px -6px hsl(0 0% 0% / 0.4);
     transition: border-color 150ms, box-shadow 150ms;
   }
   .card-2:hover {
-    box-shadow: 0 0 6px -3px hsl(var(--accent) / 0.05);
+    box-shadow: 0 2px 12px -6px hsl(0 0% 0% / 0.4), 0 0 0 1px hsl(var(--accent) / 0.12);
+  }
+  .card-2-accent {
+    @apply card-2;
+    border-left: 2px solid hsl(var(--accent));
+  }
+  .card-2-pulse {
+    @apply card-2;
+    border-left: 2px solid hsl(var(--success));
+  }
+  .card-2-time {
+    @apply card-2;
+    border-left: 2px solid hsl(var(--info));
   }
   .card-1 {
     @apply bg-[hsl(var(--bg-elev))] rounded-lg border border-[hsl(var(--border))];
+    box-shadow: 0 1px 8px -4px hsl(0 0% 0% / 0.3);
     transition: border-color 150ms, box-shadow 150ms;
   }
   .card-1:hover {
-    box-shadow: 0 0 8px -3px hsl(var(--accent) / 0.06);
+    box-shadow: 0 1px 8px -4px hsl(0 0% 0% / 0.3), 0 0 0 1px hsl(var(--accent) / 0.08);
   }
   .chip {
     @apply inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg-muted))];
