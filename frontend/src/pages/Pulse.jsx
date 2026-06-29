@@ -6,6 +6,7 @@ import { SUBJECT_LABELS, TID } from "@/lib/constants";
 import { fmtDateLong } from "@/lib/dateUtils";
 import HelpButton from "@/components/HelpButton";
 import MissionCard from "@/components/MissionCard";
+import LectureTable from "@/components/LectureTable";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
 const MOMENTUM_COLORS = (n) =>
@@ -89,6 +90,9 @@ export default function Pulse() {
 
       {/* Subject Completion */}
       <SubjectCompletionCard subjects={sortedSubjects} />
+
+      {/* Lecture Progress */}
+      <LectureTable />
 
       {/* Settings modal */}
       {showSettings && (
