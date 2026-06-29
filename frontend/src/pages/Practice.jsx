@@ -181,8 +181,8 @@ export default function Practice() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
-      <div className="flex items-center justify-between gap-2">
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="card-2 px-5 py-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="chip chip-accent">{q.subject}</span>
           {q.topic && <span className="chip">{q.topic}</span>}

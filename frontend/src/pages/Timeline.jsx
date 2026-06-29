@@ -85,8 +85,8 @@ export default function Timeline() {
   const calMap = useMemo(() => Object.fromEntries(calendarDays.map((c) => [c.date, c])), [calendarDays]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+    <div className="space-y-6">
+      <div className="card-2 px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <div>
             <h1 className="text-xl font-semibold flex items-center gap-2"><CalIcon className="w-5 h-5 text-[hsl(var(--accent))]" /> Timeline</h1>

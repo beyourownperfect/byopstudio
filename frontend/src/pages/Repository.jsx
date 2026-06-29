@@ -230,8 +230,8 @@ export default function Repository() {
   }, [subject, filterMode, setSp]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="space-y-6">
+      <div className="card-2 px-5 py-4 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <div>
             <h1 className="text-xl font-semibold">Repository</h1>

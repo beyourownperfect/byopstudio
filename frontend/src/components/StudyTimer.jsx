@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, RotateCcw, ExternalLink, Timer, StopCircle } from "lucide-react";
+import { Play, Pause, RotateCcw, Maximize2, X } from "lucide-react";
 
 const STOPWATCH_COLOR = "hsl(170 70% 45%)";
 const STOPWATCH_RUN_COLOR = "hsl(170 85% 55%)";
 const COUNTDOWN_COLOR = "hsl(24 95% 58%)";
 const COUNTDOWN_RUN_COLOR = "hsl(24 100% 63%)";
+
+const PRESETS = [5, 15, 25, 45, 60];
 
 function formatTime(totalSeconds) {
   const h = Math.floor(totalSeconds / 3600);
@@ -14,104 +16,15 @@ function formatTime(totalSeconds) {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function buildPopoutHtml(mode, colorRunning) {
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Study Timer</title><style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Inter',system-ui,sans-serif;background:#0d0d0d;color:#f5f5f5;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;user-select:none;-webkit-user-select:none;}
-.container{text-align:center;padding:20px;}
-.mode-tabs{display:inline-flex;gap:4px;background:#1a1a1a;border-radius:8px;padding:4px;margin-bottom:16px;}
-.mode-tab{border:none;background:transparent;color:#999;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600;transition:all .15s;}
-.mode-tab.active.stopwatch{background:rgba(45,212,191,.15);color:#2dd4bf;}
-.mode-tab.active.countdown{background:rgba(249,115,22,.15);color:#f97316;}
-.time{font-size:64px;font-weight:700;font-family:'JetBrains Mono',monospace;margin:12px 0;letter-spacing:4px;transition:color .3s;}
-.time.stopwatch{color:#2dd4bf;}
-.time.stopwatch.running{color:#34d399;}
-.time.countdown{color:#f97316;}
-.time.countdown.running{color:#fb923c;}
-.time.countdown.urgent{color:#ef4444;animation:pulse .8s infinite;}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.controls{display:flex;gap:8px;justify-content:center;margin-top:8px;}
-.ctrl-btn{border:none;background:#1a1a1a;color:#ccc;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:all .15s;}
-.ctrl-btn:hover{background:#2a2a2a;color:#fff;}
-.countdown-input{display:flex;gap:4px;justify-content:center;align-items:center;margin-bottom:8px;}
-.countdown-input input{width:50px;padding:4px 6px;background:#1a1a1a;border:1px solid #333;border-radius:5px;color:#f5f5f5;font-size:13px;text-align:center;outline:none;font-family:'JetBrains Mono',monospace;}
-.countdown-input input:focus{border-color:#f97316;}
-.countdown-input span{color:#666;font-size:13px;}
-.preset-btns{display:flex;gap:4px;justify-content:center;margin-top:6px;}
-.preset-btn{border:none;background:#1a1a1a;color:#999;padding:3px 10px;border-radius:4px;font-size:11px;cursor:pointer;transition:all .15s;}
-.preset-btn:hover{background:#2a2a2a;color:#ddd;}
-</style></head><body>
-<div class="container">
-  <div class="mode-tabs">
-    <button class="mode-tab stopwatch" id="btnSw">Stopwatch</button>
-    <button class="mode-tab countdown" id="btnCd">Countdown</button>
-  </div>
-  <div id="cdInput" class="countdown-input" style="display:none">
-    <input id="cdMins" type="number" min="1" max="999" value="25" placeholder="min">
-    <span>m</span>
-    <input id="cdSecs" type="number" min="0" max="59" value="0" placeholder="sec">
-    <span>s</span>
-  </div>
-  <div class="time stopwatch" id="display">00:00</div>
-  <div id="presets" class="preset-btns" style="display:none">
-    <button class="preset-btn" data-m="5">5m</button>
-    <button class="preset-btn" data-m="15">15m</button>
-    <button class="preset-btn" data-m="25">25m</button>
-    <button class="preset-btn" data-m="45">45m</button>
-    <button class="preset-btn" data-m="60">60m</button>
-  </div>
-  <div class="controls">
-    <button class="ctrl-btn" id="btnPlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
-    <button class="ctrl-btn" id="btnReset"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
-  </div>
-</div>
-<script>
-var mode='stopwatch',running=false,totalSec=0,elapsed=0,timer=null;
-var dis=document.getElementById('display'),cdInput=document.getElementById('cdInput'),
-presets=document.getElementById('presets'),btnSw=document.getElementById('btnSw'),
-btnCd=document.getElementById('btnCd'),btnPlay=document.getElementById('btnPlay'),
-btnReset=document.getElementById('btnReset'),
-cdMins=document.getElementById('cdMins'),cdSecs=document.getElementById('cdSecs');
-function pad(n){return String(n).padStart(2,'0');}
-function fmt(t){var h=Math.floor(t/3600),m=Math.floor((t%3600)/60),s=t%60;
-return h>0?h+':'+pad(m)+':'+pad(s):pad(m)+':'+pad(s);}
-function upd(){if(mode==='stopwatch'){dis.textContent=fmt(elapsed);
-dis.className='time stopwatch'+(running?' running':'');
-}else{var rem=totalSec-elapsed;if(rem<=0){stop();rem=0;}
-dis.textContent=fmt(rem);
-dis.className='time countdown'+(running?' running':'')+(rem<=30&&running?' urgent':'');}}
-function tick(){elapsed++;upd();}
-function start(){if(running)return;if(mode==='countdown'&&elapsed>=totalSec){elapsed=0;}
-running=true;timer=setInterval(tick,1000);upd();btnPlay.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';}
-function stop(){running=false;clearInterval(timer);timer=null;upd();
-btnPlay.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>';}
-function reset(){stop();elapsed=0;upd();}
-function setMode(m){mode=m;stop();elapsed=0;
-btnSw.className='mode-tab stopwatch'+(m==='stopwatch'?' active':'');
-btnCd.className='mode-tab countdown'+(m==='countdown'?' active':'');
-cdInput.style.display=m==='countdown'?'flex':'none';
-presets.style.display=m==='countdown'?'flex':'none';
-upd();}
-function setCountdown(){totalSec=parseInt(cdMins.value||0)*60+parseInt(cdSecs.value||0);if(totalSec<=0)totalSec=1500;elapsed=0;upd();}
-btnSw.onclick=function(){setMode('stopwatch');};
-btnCd.onclick=function(){setMode('countdown');setCountdown();};
-btnPlay.onclick=function(){if(running)stop();else{if(mode==='countdown'&&elapsed===0)setCountdown();start();}};
-btnReset.onclick=function(){reset();if(mode==='countdown')setCountdown();};
-cdMins.onchange=setCountdown;cdSecs.onchange=setCountdown;
-presets.querySelectorAll('.preset-btn').forEach(function(b){b.onclick=function(){cdMins.value=this.dataset.m;cdSecs.value=0;setCountdown();};});
-upd();
-</script></body></html>`;
-}
-
 export default function StudyTimer() {
   const [mode, setMode] = useState("stopwatch");
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [totalSec, setTotalSec] = useState(1500); // default 25 min
+  const [totalSec, setTotalSec] = useState(1500);
   const [countdownMins, setCountdownMins] = useState(25);
   const [countdownSecs, setCountdownSecs] = useState(0);
+  const [focusOpen, setFocusOpen] = useState(false);
   const intervalRef = useRef(null);
-  const popoutRef = useRef(null);
 
   const start = useCallback(() => {
     if (running) return;
@@ -124,18 +37,16 @@ export default function StudyTimer() {
     setRunning(true);
   }, [running, mode, countdownMins, countdownSecs, elapsed]);
 
-  const pause = useCallback(() => {
-    setRunning(false);
-  }, []);
+  const pause = useCallback(() => setRunning(false), []);
 
   const reset = useCallback(() => {
     setRunning(false);
     setElapsed(0);
-  }, []);
+    if (mode === "countdown") setTotalSec(countdownMins * 60 + countdownSecs);
+  }, [mode, countdownMins, countdownSecs]);
 
   const toggle = useCallback(() => {
-    if (running) pause();
-    else start();
+    if (running) pause(); else start();
   }, [running, start, pause]);
 
   useEffect(() => {
@@ -154,38 +65,30 @@ export default function StudyTimer() {
     }
   }, [elapsed, running, mode, totalSec]);
 
-  const display = mode === "stopwatch" ? elapsed : totalSec - elapsed;
-  const isUrgent = mode === "countdown" && running && display <= 30 && display >= 0;
-
   const switchMode = (m) => {
     setRunning(false);
     setElapsed(0);
     setMode(m);
   };
 
-  const openPopout = () => {
-    if (popoutRef.current && !popoutRef.current.closed) {
-      popoutRef.current.focus();
-      return;
-    }
-    const runColor = mode === "countdown" ? COUNTDOWN_RUN_COLOR : STOPWATCH_RUN_COLOR;
-    const w = 300, h = 320;
-    const left = window.screenX + window.innerWidth - w - 40;
-    const top = window.screenY + 80;
-    const win = window.open("", "study-timer", `width=${w},height=${h},left=${left},top=${top},noopener`);
-    if (!win) return;
-    win.document.write(buildPopoutHtml(mode, runColor));
-    win.document.close();
-    popoutRef.current = win;
-  };
+  const closeFocus = useCallback(() => setFocusOpen(false), []);
 
+  useEffect(() => {
+    if (!focusOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") closeFocus(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [focusOpen, closeFocus]);
+
+  const display = mode === "stopwatch" ? elapsed : totalSec - elapsed;
+  const isUrgent = mode === "countdown" && running && display <= 30 && display >= 0;
   const color = mode === "stopwatch"
     ? (running ? STOPWATCH_RUN_COLOR : STOPWATCH_COLOR)
     : (running ? COUNTDOWN_RUN_COLOR : COUNTDOWN_COLOR);
 
   return (
     <div>
-      {/* Inline compact timer */}
+      {/* ── Inline compact timer bar ── */}
       <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-[hsl(var(--bg-elev))] px-3 py-1.5">
         {/* Mode tabs */}
         <div className="flex rounded-md bg-[hsl(var(--bg-elev-2))] p-0.5">
@@ -211,18 +114,14 @@ export default function StudyTimer() {
         {mode === "countdown" && !running && (
           <div className="flex items-center gap-1">
             <input
-              type="number"
-              min="1"
-              max="999"
+              type="number" min="1" max="999"
               value={countdownMins}
               onChange={(e) => setCountdownMins(Math.max(0, parseInt(e.target.value) || 0))}
               className="w-10 px-1 py-0.5 text-[11px] text-center bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] mono"
             />
             <span className="text-[10px] text-[hsl(var(--fg-muted))]">m</span>
             <input
-              type="number"
-              min="0"
-              max="59"
+              type="number" min="0" max="59"
               value={countdownSecs}
               onChange={(e) => setCountdownSecs(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
               className="w-10 px-1 py-0.5 text-[11px] text-center bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] mono"
@@ -249,12 +148,117 @@ export default function StudyTimer() {
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
 
-        {/* Divider + popout */}
         <span className="w-px h-5 bg-border mx-0.5" />
-        <button onClick={openPopout} className="btn-ghost p-1" title="Pop out">
-          <ExternalLink className="w-3.5 h-3.5" />
+        <button onClick={() => setFocusOpen(true)} className="btn-ghost p-1" title="Focus mode">
+          <Maximize2 className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* ── Focus Mode Modal ── */}
+      {focusOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Dimmed backdrop */}
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={closeFocus} />
+
+          <div className="relative card-2 p-8 text-center select-none">
+            {/* Close button */}
+            <button onClick={closeFocus} className="absolute top-3 right-3 btn-ghost p-1 text-[hsl(var(--fg-muted))] hover:text-[hsl(var(--fg))]" title="Close (Esc)">
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Mode tabs */}
+            <div className="inline-flex gap-1 rounded-lg bg-[hsl(var(--bg-elev-2))] p-1 mb-6">
+              <button
+                onClick={() => switchMode("stopwatch")}
+                className={`px-5 py-2 text-sm font-semibold rounded-md transition-all ${
+                  mode === "stopwatch"
+                    ? "bg-(--color-stopwatch)/20 text-(--color-stopwatch)"
+                    : "text-[hsl(var(--fg-muted))]"
+                }`}
+                style={{ "--color-stopwatch": STOPWATCH_COLOR }}
+              >
+                Stopwatch
+              </button>
+              <button
+                onClick={() => switchMode("countdown")}
+                className={`px-5 py-2 text-sm font-semibold rounded-md transition-all ${
+                  mode === "countdown"
+                    ? "bg-(--color-countdown)/20 text-(--color-countdown)"
+                    : "text-[hsl(var(--fg-muted))]"
+                }`}
+                style={{ "--color-countdown": COUNTDOWN_COLOR }}
+              >
+                Countdown
+              </button>
+            </div>
+
+            {/* Countdown setup inputs (only when stopped) */}
+            {mode === "countdown" && !running && (
+              <div className="flex items-center justify-center gap-2 mb-6">
+                <input
+                  type="number" min="1" max="999"
+                  value={countdownMins}
+                  onChange={(e) => { setCountdownMins(Math.max(0, parseInt(e.target.value) || 0)); const t = (parseInt(e.target.value) || 0) * 60 + countdownSecs; if (t > 0) setTotalSec(t); }}
+                  className="w-20 px-3 py-2 text-lg text-center bg-[hsl(var(--bg-elev-2))] border border-border rounded-lg outline-none focus:border-[hsl(var(--accent))] mono"
+                  placeholder="min"
+                />
+                <span className="text-sm text-[hsl(var(--fg-muted))]">m</span>
+                <input
+                  type="number" min="0" max="59"
+                  value={countdownSecs}
+                  onChange={(e) => { setCountdownSecs(Math.min(59, Math.max(0, parseInt(e.target.value) || 0))); const t = countdownMins * 60 + (parseInt(e.target.value) || 0); if (t > 0) setTotalSec(t); }}
+                  className="w-20 px-3 py-2 text-lg text-center bg-[hsl(var(--bg-elev-2))] border border-border rounded-lg outline-none focus:border-[hsl(var(--accent))] mono"
+                  placeholder="sec"
+                />
+                <span className="text-sm text-[hsl(var(--fg-muted))]">s</span>
+              </div>
+            )}
+
+            {/* Large time display */}
+            <div
+              className={`mono font-bold text-8xl tracking-[0.08em] leading-none transition-colors ${isUrgent ? "text-[hsl(var(--danger))] animate-pulse" : ""}`}
+              style={{ color: !isUrgent ? color : undefined }}
+            >
+              {formatTime(display)}
+            </div>
+
+            {/* Preset buttons (countdown only) */}
+            {mode === "countdown" && !running && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                {PRESETS.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => { setCountdownMins(m); setCountdownSecs(0); setTotalSec(m * 60); setElapsed(0); }}
+                    className="px-3 py-1.5 text-sm rounded-md border border-border bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg-muted))] hover:border-[hsl(var(--accent))] hover:text-[hsl(var(--fg))] transition-colors"
+                  >
+                    {m}m
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Controls */}
+            <div className="flex items-center justify-center gap-4 mt-8">
+              <button
+                onClick={toggle}
+                className="w-14 h-14 rounded-full border-2 border-[hsl(var(--accent))] flex items-center justify-center hover:bg-[hsl(var(--accent))]/10 transition-colors"
+                title={running ? "Pause" : "Start"}
+              >
+                {running ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+              </button>
+              <button
+                onClick={reset}
+                className="w-14 h-14 rounded-full border-2 border-[hsl(var(--border))] flex items-center justify-center text-[hsl(var(--fg-muted))] hover:border-[hsl(var(--fg-muted))] hover:text-[hsl(var(--fg))] transition-colors"
+                title="Reset"
+              >
+                <RotateCcw className="w-6 h-6" />
+              </button>
+            </div>
+
+            <p className="text-[11px] text-[hsl(var(--fg-subtle))] mt-6">Press Esc or click outside to close</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -180,9 +180,9 @@ export default function Log() {
   const activeSubjects = new Set(logs.map((l) => l.subject).filter(Boolean)).size;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-end justify-between flex-wrap gap-3">
+      <div className="card-2 px-5 py-4 flex items-end justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <div>
             <h1 className="text-xl font-semibold">Log</h1>
