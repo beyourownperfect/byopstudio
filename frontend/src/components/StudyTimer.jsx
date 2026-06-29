@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Play, Pause, RotateCcw, Maximize2, X, Save } from "lucide-react";
 import { logsApi } from "@/lib/api";
-import { SUBJECTS } from "@/lib/constants";
+import { SUBJECTS, ACTIVITIES } from "@/lib/constants";
 import { todayISO } from "@/lib/dateUtils";
 
 const STOPWATCH_COLOR = "hsl(170 70% 45%)";
@@ -38,10 +38,15 @@ export default function StudyTimer() {
   const [countdownMins, setCountdownMins] = useState(saved?.countdownMins || 25);
   const [countdownSecs, setCountdownSecs] = useState(saved?.countdownSecs || 0);
   const [timerSubject, setTimerSubject] = useState(saved?.timerSubject || "OS");
+  const [timerActivity, setTimerActivity] = useState(saved?.timerActivity || "Practice");
+  const [timerTopic, setTimerTopic] = useState(saved?.timerTopic || "");
+  const [timerJournal, setTimerJournal] = useState("");
   const [focusOpen, setFocusOpen] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const intervalRef = useRef(null);
   const loggedRef = useRef(false);
+  const toggleRef = useRef(null);
+  const resetRef = useRef(null);
 
   const setRunning = (r) => {
     setRunningState(r);
@@ -49,8 +54,8 @@ export default function StudyTimer() {
   };
 
   useEffect(() => {
-    saveState({ mode, elapsed, totalSec, countdownMins, countdownSecs, timerSubject, running });
-  }, [mode, elapsed, totalSec, countdownMins, countdownSecs, timerSubject, running]);
+    saveState({ mode, elapsed, totalSec, countdownMins, countdownSecs, timerSubject, timerTopic, running });
+  }, [mode, elapsed, totalSec, countdownMins, countdownSecs, timerSubject, timerTopic, running]);
 
   const start = useCallback(() => {
     if (running) return;
@@ -75,6 +80,8 @@ export default function StudyTimer() {
   const toggle = useCallback(() => {
     if (running) pause(); else start();
   }, [running, start, pause]);
+  toggleRef.current = toggle;
+  resetRef.current = reset;
 
   useEffect(() => {
     if (running) {
@@ -92,18 +99,18 @@ export default function StudyTimer() {
       const minutes = Math.round(totalSec / 60) || 1;
       logsApi.create({
         date: todayISO(),
-        activity: "Practice",
+        activity: timerActivity,
         subject: timerSubject,
-        topic: "",
+        topic: timerTopic,
         duration_min: minutes,
-        remarks: `Countdown timer: ${countdownMins}m session`,
+        remarks: timerJournal || `Countdown timer: ${countdownMins}m session`,
       }).then(() => {
         setSavedToast(true);
         setTimeout(() => setSavedToast(false), 3000);
       }).catch(() => {});
       new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gICAf39/gICAf3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f4B/f3+AgICAf3+AgH9/f3+AgICAf3+AgICAf3+AgICAf39/gICAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gID//w==").play().catch(() => {});
     }
-  }, [elapsed, running, mode, totalSec, countdownMins, timerSubject]);
+  }, [elapsed, running, mode, totalSec, countdownMins, timerSubject, timerActivity, timerJournal, timerTopic]);
 
   const switchMode = (m) => {
     setRunning(false);
@@ -119,15 +126,17 @@ export default function StudyTimer() {
     ) || 1;
     await logsApi.create({
       date: todayISO(),
-      activity: "Practice",
+      activity: timerActivity,
       subject: timerSubject,
-      topic: "",
+      topic: timerTopic,
       duration_min: minutes,
       remarks:
-        mode === "stopwatch"
+        timerJournal ||
+        (mode === "stopwatch"
           ? `Stopwatch: ${formatTime(elapsed)}`
-          : `Countdown timer: ${countdownMins}m session`,
+          : `Countdown timer: ${countdownMins}m session`),
     });
+    setTimerJournal("");
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 3000);
     reset();
@@ -135,13 +144,30 @@ export default function StudyTimer() {
 
   useEffect(() => {
     if (!focusOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     const onKey = (e) => { if (e.key === "Escape") closeFocus(); };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+    };
   }, [focusOpen, closeFocus]);
 
-  const display = mode === "stopwatch" ? elapsed : totalSec - elapsed;
-  const isUrgent = mode === "countdown" && running && display <= 30 && display >= 0;
+  // Global keyboard shortcuts for timer
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target?.tagName || "").toLowerCase();
+      if (["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable) return;
+      if (e.key === " " || e.code === "Space") { e.preventDefault(); toggleRef.current?.(); }
+      else if (e.key === "r" || e.key === "R") { resetRef.current?.(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const display = mode === "stopwatch" ? elapsed : Math.max(0, totalSec - elapsed);
+  const isUrgent = mode === "countdown" && running && display <= 30;
   const color = mode === "stopwatch"
     ? (running ? STOPWATCH_RUN_COLOR : STOPWATCH_COLOR)
     : (running ? COUNTDOWN_RUN_COLOR : COUNTDOWN_COLOR);
@@ -198,6 +224,15 @@ export default function StudyTimer() {
           {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
 
+        {/* Topic input */}
+        <input
+          value={timerTopic}
+          onChange={(e) => setTimerTopic(e.target.value)}
+          placeholder="topic"
+          className="w-[72px] px-1.5 py-0.5 text-[10px] bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] placeholder:text-[hsl(var(--fg-subtle))]/50"
+          title="Topic (saved to log)"
+        />
+
         {/* Time display */}
         <span
           className={`mono font-bold text-lg tabular-nums tracking-wider transition-colors ${
@@ -225,7 +260,7 @@ export default function StudyTimer() {
         </button>
 
         {/* Saved toast */}
-        {savedToast && (
+        {savedToast && !focusOpen && (
           <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-[hsl(var(--success))] whitespace-nowrap animate-modal-in">
             ✓ Saved to log
           </span>
@@ -333,7 +368,54 @@ export default function StudyTimer() {
               </button>
             </div>
 
-            <p className="text-[11px] text-[hsl(var(--fg-subtle))] mt-6">Press Esc or click outside to close</p>
+            {/* Activity + subject + journal */}
+            <div className="mt-6 max-w-xs mx-auto space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="text-left">
+                  <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Subject</label>
+                  <select value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
+                    className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
+                  >
+                    {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div className="text-left">
+                  <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Activity</label>
+                  <select value={timerActivity} onChange={(e) => setTimerActivity(e.target.value)}
+                    className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
+                  >
+                    {ACTIVITIES.map((a) => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="text-left">
+                <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Topic</label>
+                <input
+                  value={timerTopic}
+                  onChange={(e) => setTimerTopic(e.target.value)}
+                  placeholder="e.g. Trees, Caches…"
+                  className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
+                />
+              </div>
+              <div className="text-left">
+                <textarea
+                  value={timerJournal}
+                  onChange={(e) => setTimerJournal(e.target.value)}
+                  rows={2}
+                  placeholder="What was hard? What clicked? What to revisit?"
+                  className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full outline-none focus:border-[hsl(var(--accent))] resize-none min-h-[48px]"
+                />
+              </div>
+            </div>
+            <button onClick={saveToLog} className="btn btn-primary mt-3 text-xs" disabled={display <= 0}>
+              <Save className="w-3 h-3" /> Save to log
+            </button>
+
+            {savedToast && (
+              <p className="text-[10px] text-[hsl(var(--success))] mt-2 animate-modal-in">✓ Saved to log</p>
+            )}
+
+            <p className="text-[11px] text-[hsl(var(--fg-subtle))] mt-4">Esc to close · Space = start/pause · R = reset</p>
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Plus, Trash2, Clock, Play, Pause, Square, ChevronDown, CheckCircle, X as XIcon } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Plus, Trash2, Clock, ChevronDown, CheckCircle, X as XIcon } from "lucide-react";
 import { logsApi, subjectCompletionApi } from "@/lib/api";
 import { SUBJECTS, ACTIVITIES, TID } from "@/lib/constants";
 import { todayISO, fmtDate, fmtDuration, isoAdd } from "@/lib/dateUtils";
@@ -13,39 +14,20 @@ const emptyForm = {
   duration_min: 30, questions_attempted: 0, questions_correct: 0, questions_wrong: 0, remarks: "",
 };
 
-// ============== Stopwatch hook ==============
-function useStopwatch() {
-  const [running, setRunning] = useState(false);
-  const [elapsedMs, setElapsedMs] = useState(0);
-  const startedAtRef = useRef(null);
-  const tickRef = useRef(null);
-
-  useEffect(() => {
-    if (!running) return;
-    tickRef.current = setInterval(() => {
-      setElapsedMs(Date.now() - startedAtRef.current);
-    }, 250);
-    return () => clearInterval(tickRef.current);
-  }, [running]);
-
-  const start = () => {
-    startedAtRef.current = Date.now() - elapsedMs;
-    setRunning(true);
-  };
-  const pause = () => setRunning(false);
-  const reset = () => { setRunning(false); setElapsedMs(0); startedAtRef.current = null; };
-  const minutes = Math.floor(elapsedMs / 60000);
-
-  return { running, elapsedMs, minutes, start, pause, reset };
+function parseTimerState() {
+  try {
+    const raw = sessionStorage.getItem("byop.timer");
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
 }
 
-function fmtTimer(ms) {
-  const total = Math.floor(ms / 1000);
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  if (h > 0) return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+function getTimerStatusText(state) {
+  if (!state || !state.running) return null;
+  const mode = state.mode === "countdown" ? "Countdown" : "Stopwatch";
+  const mins = state.mode === "countdown"
+    ? Math.round((state.totalSec - state.elapsed) / 60)
+    : Math.round(state.elapsed / 60);
+  return `${mode} running${mins > 0 ? ` · ${mins}m elapsed` : ""}`;
 }
 
 export default function Log() {
@@ -55,11 +37,7 @@ export default function Log() {
   const [form, setForm] = useState(emptyForm);
   const [expandedDates, setExpandedDates] = useState({});
 
-  const sw = useStopwatch();
-  const [swSubject, setSwSubject] = useState("OS");
-  const [swActivity, setSwActivity] = useState("Reading");
-  const [swTopic, setSwTopic] = useState("");
-  const [swJournal, setSwJournal] = useState("");
+  const [timerState, setTimerState] = useState(() => parseTimerState());
 
   const [completions, setCompletions] = useState([]);
   const [completionExpanded, setCompletionExpanded] = useState(false);
@@ -80,17 +58,16 @@ export default function Log() {
     setLogs(res.items || []);
   };
 
-  const loadLectures = async () => {
-    const res = await lecturesApi.list();
-    setLectures(res.items || []);
-  };
-
   const loadCompletions = async (subj) => {
     const res = await subjectCompletionApi.list(subj ? { subject: subj } : {});
     setCompletions(res.items || []);
   };
 
   useEffect(() => { load(); }, [view]); // eslint-disable-line
+  useEffect(() => {
+    const poll = setInterval(() => setTimerState(parseTimerState()), 1000);
+    return () => clearInterval(poll);
+  }, []);
   useEffect(() => {
     if (completionExpanded && completions.length === 0) loadCompletions();
   }, [completionExpanded]); // eslint-disable-line
@@ -112,12 +89,10 @@ export default function Log() {
       const tag = (e.target?.tagName || "").toLowerCase();
       if (["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable) return;
       if (e.key === "n" || e.key === "N") { setOpen(true); }
-      else if (e.key === " " || e.code === "Space") { e.preventDefault(); sw.running ? sw.pause() : sw.start(); }
-      else if (e.key === "r" || e.key === "R") { sw.reset(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [sw]);
+  }, []);
 
   const submit = async () => {
     await logsApi.create({ ...form, duration_min: Number(form.duration_min) });
@@ -129,18 +104,6 @@ export default function Log() {
   const remove = async (id) => {
     if (!window.confirm("Delete log?")) return;
     await logsApi.remove(id);
-    load();
-  };
-
-  const saveStopwatch = async () => {
-    if (sw.minutes < 1) { alert("Stopwatch needs at least 1 minute to save."); return; }
-    await logsApi.create({
-      date: todayISO(), activity: swActivity, subject: swSubject, topic: swTopic,
-      duration_min: sw.minutes, remarks: swJournal || "(stopwatch session)",
-    });
-    sw.reset();
-    setSwTopic("");
-    setSwJournal("");
     load();
   };
 
@@ -233,55 +196,17 @@ export default function Log() {
         </div>
       </div>
 
-      {/* Stopwatch + journal */}
-      <div className="card-2 p-4 sm:p-5" data-testid="log-stopwatch">
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <div className="label-x">Live session stopwatch</div>
-          <div className="text-[10px] text-[hsl(var(--fg-subtle))] uppercase tracking-[0.18em] hidden sm:block">
-            Space = start/pause · R = reset · N = new log
-          </div>
+      {/* Live timer status — bridged from PULSE */}
+      <div className="card-2 p-3 flex items-center justify-between flex-wrap gap-3 text-sm">
+        <div className="flex items-center gap-3 min-w-0">
+          <Clock className="w-4 h-4 text-[hsl(var(--accent))] shrink-0" />
+          <span className="text-[hsl(var(--fg-muted))] truncate">
+            {getTimerStatusText(timerState) || "Study timer lives on"}
+          </span>
         </div>
-        <div className="grid lg:grid-cols-[auto_1fr] gap-4 lg:gap-6 items-start">
-          <div className="flex flex-col items-center lg:items-start">
-            <div data-testid="stopwatch-display" className="mono font-semibold tabular-nums text-5xl sm:text-6xl tracking-tight text-[hsl(var(--accent))]">
-              {fmtTimer(sw.elapsedMs)}
-            </div>
-            <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-1">
-              {sw.minutes} min logged · {sw.running ? "Running" : sw.elapsedMs > 0 ? "Paused" : "Idle"}
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              {!sw.running ? (
-                <button data-testid="stopwatch-start" onClick={sw.start} className="btn btn-primary"><Play className="w-3.5 h-3.5" /> {sw.elapsedMs > 0 ? "Resume" : "Start"}</button>
-              ) : (
-                <button data-testid="stopwatch-pause" onClick={sw.pause} className="btn"><Pause className="w-3.5 h-3.5" /> Pause</button>
-              )}
-              <button data-testid="stopwatch-reset" onClick={sw.reset} className="btn" disabled={sw.elapsedMs === 0 && !sw.running}><Square className="w-3.5 h-3.5" /> Reset</button>
-              <button data-testid="stopwatch-save" onClick={saveStopwatch} className="btn" disabled={sw.minutes < 1}>Save to log</button>
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="label-x">Subject</label>
-              <select value={swSubject} onChange={(e) => setSwSubject(e.target.value)} className="input mt-1">
-                {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label-x">Activity</label>
-              <select value={swActivity} onChange={(e) => setSwActivity(e.target.value)} className="input mt-1">
-                {ACTIVITIES.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label-x">Topic</label>
-              <input value={swTopic} onChange={(e) => setSwTopic(e.target.value)} className="input mt-1" placeholder="e.g. Trees, Caches…" />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label-x">Journal note <span className="lowercase text-[hsl(var(--fg-subtle))]">(what was hard / what clicked / what to revisit)</span></label>
-              <textarea data-testid="log-journal" value={swJournal} onChange={(e) => setSwJournal(e.target.value)} rows={2} className="input mt-1 min-h-[60px]" placeholder="Short reflection — one or two lines." />
-            </div>
-          </div>
-        </div>
+        <Link to="/pulse" className="text-[hsl(var(--accent))] font-medium hover:underline whitespace-nowrap text-xs">
+          Pulse &rarr;
+        </Link>
       </div>
 
       {/* Session summary */}
