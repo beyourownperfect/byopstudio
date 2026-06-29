@@ -2,11 +2,13 @@
 BYOPGateCS.studio — GATE CSE Study Operating System
 Single-user backend. MongoDB. FastAPI.
 """
+
 from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import sys
 import random
 import logging
 from pathlib import Path
@@ -16,11 +18,23 @@ import uuid
 from datetime import datetime, timezone, date, timedelta
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / ".env")
 
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+mongo_url = os.environ.get("MONGO_URL")
+db_name = os.environ.get("DB_NAME", "byopstudio")
+
+if mongo_url:
+    client = AsyncIOMotorClient(mongo_url)
+    db = client[db_name]
+else:
+    try:
+        import mongomock_motor
+
+        client = mongomock_motor.AsyncMongoMockClient()
+        db = client[db_name]
+    except Exception as exc:
+        print(f"Failed to initialize fallback database backend: {exc}", file=sys.stderr)
+        raise
 
 app = FastAPI(title="BYOPGateCS.studio API")
 api_router = APIRouter(prefix="/api")
@@ -28,8 +42,17 @@ api_router = APIRouter(prefix="/api")
 SUBJECTS = ["C", "DS", "AL", "OS", "DB", "COA", "TOC", "CD", "DL", "EM", "DM", "CN"]
 ACTIVITIES = ["Lecture", "Practice", "Revision", "Mock Test", "Reading"]
 SRS_INTERVALS = [1, 3, 7, 14, 30, 90]  # days
-REVISIT_TYPES = ["question", "note", "journal", "study_session", "lecture",
-                 "timeline_entry", "mock_test", "weak_topic", "repository_item"]
+REVISIT_TYPES = [
+    "question",
+    "note",
+    "journal",
+    "study_session",
+    "lecture",
+    "timeline_entry",
+    "mock_test",
+    "weak_topic",
+    "repository_item",
+]
 
 
 def now_iso() -> str:
@@ -59,7 +82,9 @@ class Question(BaseModel):
     question_type: Literal["MCQ", "MSQ", "NAT"] = "MCQ"
     statement: str
     options: List[str] = Field(default_factory=list)
-    correct_answer: str = ""  # for MCQ: option letter; MSQ: comma-separated; NAT: number
+    correct_answer: str = (
+        ""  # for MCQ: option letter; MSQ: comma-separated; NAT: number
+    )
     explanation: str = ""
     gateoverflow_url: str = ""
     year: Optional[int] = None
@@ -166,7 +191,7 @@ class RevisitItem(BaseModel):
 
 class Settings(BaseModel):
     id: str = "singleton"
-    exam_date: str = "2026-02-07"   # GATE 2026 weekend (default; user editable)
+    exam_date: str = "2026-02-07"  # GATE 2026 weekend (default; user editable)
     daily_question_target: int = 20
     daily_revision_target: int = 10
     daily_study_minutes_target: int = 240
@@ -175,6 +200,7 @@ class Settings(BaseModel):
 
 class UserMission(BaseModel):
     """User-authored mission task (separate from system-computed recommendations)."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str
     notes: str = ""
@@ -234,7 +260,11 @@ async def root():
 
 @api_router.get("/meta")
 async def meta():
-    return {"subjects": SUBJECTS, "activities": ACTIVITIES, "srs_intervals": SRS_INTERVALS}
+    return {
+        "subjects": SUBJECTS,
+        "activities": ACTIVITIES,
+        "srs_intervals": SRS_INTERVALS,
+    }
 
 
 # ============================ SETTINGS =============================
@@ -270,7 +300,9 @@ async def list_questions(
     difficulty: Optional[str] = None,
     bookmarked: Optional[bool] = None,
     search: Optional[str] = None,
-    filter_mode: Optional[str] = None,  # due_today, revisit_today, wrong, weak, never_attempted, mastered
+    filter_mode: Optional[
+        str
+    ] = None,  # due_today, revisit_today, wrong, weak, never_attempted, mastered
     limit: int = 1000,
     skip: int = 0,
 ):
@@ -292,20 +324,35 @@ async def list_questions(
             {"notes": {"$regex": search, "$options": "i"}},
         ]
 
-    docs = await db.questions.find(query, {"_id": 0}).sort("updated_at", -1).skip(skip).to_list(limit)
+    docs = (
+        await db.questions.find(query, {"_id": 0})
+        .sort("updated_at", -1)
+        .skip(skip)
+        .to_list(limit)
+    )
 
     # Enrich each with srs + last attempt
     today = today_iso()
     enriched = []
     for q in docs:
         srs = await db.srs.find_one({"question_id": q["id"]}, {"_id": 0}) or {}
-        last_attempt = await db.attempts.find_one({"question_id": q["id"]}, {"_id": 0}, sort=[("created_at", -1)])
+        last_attempt = await db.attempts.find_one(
+            {"question_id": q["id"]}, {"_id": 0}, sort=[("created_at", -1)]
+        )
         last_revisit = await db.revisits.find_one(
-            {"item_type": "question", "item_id": q["id"]}, {"_id": 0}, sort=[("revisit_date", -1)]
+            {"item_type": "question", "item_id": q["id"]},
+            {"_id": 0},
+            sort=[("revisit_date", -1)],
         )
         next_revisit_doc = await db.revisits.find_one(
-            {"item_type": "question", "item_id": q["id"], "completed": False, "revisit_date": {"$gte": today}},
-            {"_id": 0}, sort=[("revisit_date", 1)]
+            {
+                "item_type": "question",
+                "item_id": q["id"],
+                "completed": False,
+                "revisit_date": {"$gte": today},
+            },
+            {"_id": 0},
+            sort=[("revisit_date", 1)],
         )
         q["srs"] = srs
         q["mastery"] = _compute_mastery(srs)
@@ -314,26 +361,44 @@ async def list_questions(
         q["confidence"] = last_attempt["confidence"] if last_attempt else None
         q["next_revision_date"] = srs.get("next_review_date")
         q["last_reviewed"] = srs.get("last_reviewed")
-        q["next_revisit_date"] = next_revisit_doc["revisit_date"] if next_revisit_doc else None
+        q["next_revisit_date"] = (
+            next_revisit_doc["revisit_date"] if next_revisit_doc else None
+        )
         q["last_revisit_date"] = last_revisit["revisit_date"] if last_revisit else None
         enriched.append(q)
 
     # filter_mode is applied post-enrichment
     if filter_mode:
         if filter_mode == "due_today":
-            enriched = [q for q in enriched if q.get("next_revision_date") and q["next_revision_date"] <= today]
+            enriched = [
+                q
+                for q in enriched
+                if q.get("next_revision_date") and q["next_revision_date"] <= today
+            ]
         elif filter_mode == "revisit_today":
-            revisit_ids = {r["item_id"] for r in await db.revisits.find(
-                {"item_type": "question", "completed": False, "revisit_date": {"$lte": today}},
-                {"_id": 0},
-            ).to_list(10000)}
+            revisit_ids = {
+                r["item_id"]
+                for r in await db.revisits.find(
+                    {
+                        "item_type": "question",
+                        "completed": False,
+                        "revisit_date": {"$lte": today},
+                    },
+                    {"_id": 0},
+                ).to_list(10000)
+            }
             enriched = [q for q in enriched if q["id"] in revisit_ids]
         elif filter_mode == "bookmarked":
             enriched = [q for q in enriched if q.get("bookmarked")]
         elif filter_mode == "wrong":
             enriched = [q for q in enriched if q.get("last_attempt_correct") is False]
         elif filter_mode == "weak":
-            enriched = [q for q in enriched if q.get("mastery", 0) < 40 and q.get("srs", {}).get("total_attempts", 0) > 0]
+            enriched = [
+                q
+                for q in enriched
+                if q.get("mastery", 0) < 40
+                and q.get("srs", {}).get("total_attempts", 0) > 0
+            ]
         elif filter_mode == "never_attempted":
             enriched = [q for q in enriched if not q.get("last_attempt")]
         elif filter_mode == "mastered":
@@ -348,7 +413,11 @@ async def get_question(qid: str):
     if not q:
         raise HTTPException(404, "Question not found")
     srs = await db.srs.find_one({"question_id": qid}, {"_id": 0}) or {}
-    attempts = await db.attempts.find({"question_id": qid}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    attempts = (
+        await db.attempts.find({"question_id": qid}, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(50)
+    )
     q["srs"] = srs
     q["mastery"] = _compute_mastery(srs)
     q["attempts"] = attempts
@@ -361,7 +430,9 @@ async def update_question(qid: str, payload: QuestionUpdate):
     if not update:
         raise HTTPException(400, "No fields to update")
     update["updated_at"] = now_iso()
-    res = await db.questions.find_one_and_update({"id": qid}, {"$set": update}, return_document=True)
+    res = await db.questions.find_one_and_update(
+        {"id": qid}, {"$set": update}, return_document=True
+    )
     if not res:
         raise HTTPException(404, "Question not found")
     return strip_id(res)
@@ -426,34 +497,63 @@ async def next_question(
 
     candidates: List[dict] = []
     if mode == "due":
-        due_srs = await db.srs.find({"next_review_date": {"$lte": today}}, {"_id": 0}).to_list(1000)
+        due_srs = await db.srs.find(
+            {"next_review_date": {"$lte": today}}, {"_id": 0}
+        ).to_list(1000)
         ids = [s["question_id"] for s in due_srs if s["question_id"] not in exclude]
         if ids:
             q = {**query, "id": {"$in": ids}}
             candidates = await db.questions.find(q, {"_id": 0}).to_list(1000)
     elif mode == "wrong":
         # latest attempt was wrong
-        all_attempts = await db.attempts.find({}, {"_id": 0}).sort("created_at", -1).to_list(5000)
+        all_attempts = (
+            await db.attempts.find({}, {"_id": 0}).sort("created_at", -1).to_list(5000)
+        )
         latest_by_q: Dict[str, dict] = {}
         for a in all_attempts:
             if a["question_id"] not in latest_by_q:
                 latest_by_q[a["question_id"]] = a
-        ids = [qid for qid, a in latest_by_q.items() if not a["correct"] and qid not in exclude]
+        ids = [
+            qid
+            for qid, a in latest_by_q.items()
+            if not a["correct"] and qid not in exclude
+        ]
         if ids:
-            candidates = await db.questions.find({**query, "id": {"$in": ids}}, {"_id": 0}).to_list(1000)
+            candidates = await db.questions.find(
+                {**query, "id": {"$in": ids}}, {"_id": 0}
+            ).to_list(1000)
     elif mode == "bookmarked":
-        candidates = await db.questions.find({**query, "bookmarked": True, "id": {"$nin": list(exclude)}}, {"_id": 0}).to_list(1000)
+        candidates = await db.questions.find(
+            {**query, "bookmarked": True, "id": {"$nin": list(exclude)}}, {"_id": 0}
+        ).to_list(1000)
     elif mode == "weak":
-        all_srs = await db.srs.find({"total_attempts": {"$gt": 0}}, {"_id": 0}).to_list(5000)
-        weak_ids = [s["question_id"] for s in all_srs if _compute_mastery(s) < 40 and s["question_id"] not in exclude]
+        all_srs = await db.srs.find({"total_attempts": {"$gt": 0}}, {"_id": 0}).to_list(
+            5000
+        )
+        weak_ids = [
+            s["question_id"]
+            for s in all_srs
+            if _compute_mastery(s) < 40 and s["question_id"] not in exclude
+        ]
         if weak_ids:
-            candidates = await db.questions.find({**query, "id": {"$in": weak_ids}}, {"_id": 0}).to_list(1000)
+            candidates = await db.questions.find(
+                {**query, "id": {"$in": weak_ids}}, {"_id": 0}
+            ).to_list(1000)
     elif mode == "new":
-        attempted_ids = {a["question_id"] for a in await db.attempts.find({}, {"_id": 0, "question_id": 1}).to_list(50000)}
+        attempted_ids = {
+            a["question_id"]
+            for a in await db.attempts.find({}, {"_id": 0, "question_id": 1}).to_list(
+                50000
+            )
+        }
         all_qs = await db.questions.find(query, {"_id": 0}).to_list(5000)
-        candidates = [q for q in all_qs if q["id"] not in attempted_ids and q["id"] not in exclude]
+        candidates = [
+            q for q in all_qs if q["id"] not in attempted_ids and q["id"] not in exclude
+        ]
     else:  # all / subject
-        candidates = await db.questions.find({**query, "id": {"$nin": list(exclude)}}, {"_id": 0}).to_list(5000)
+        candidates = await db.questions.find(
+            {**query, "id": {"$nin": list(exclude)}}, {"_id": 0}
+        ).to_list(5000)
 
     if not candidates:
         return None
@@ -477,8 +577,13 @@ async def submit_practice(payload: Dict[str, Any]):
     if not q:
         raise HTTPException(404, "Question not found")
 
-    attempt = Attempt(question_id=qid, correct=correct, confidence=confidence,
-                     user_answer=user_answer, time_taken_sec=time_taken)
+    attempt = Attempt(
+        question_id=qid,
+        correct=correct,
+        confidence=confidence,
+        user_answer=user_answer,
+        time_taken_sec=time_taken,
+    )
     await db.attempts.insert_one(attempt.model_dump())
 
     srs = await _ensure_srs(qid)
@@ -505,21 +610,30 @@ async def submit_practice(payload: Dict[str, Any]):
     await db.srs.update_one({"question_id": qid}, {"$set": update}, upsert=True)
 
     # auto-log: aggregate practice into today's practice log for this subject
-    log_filter = {"date": today_iso(), "activity": "Practice", "subject": q["subject"], "auto": True}
+    log_filter = {
+        "date": today_iso(),
+        "activity": "Practice",
+        "subject": q["subject"],
+        "auto": True,
+    }
     existing = await db.study_logs.find_one(log_filter, {"_id": 0})
     if existing:
         await db.study_logs.update_one(
             {"id": existing["id"]},
-            {"$inc": {
-                "questions_attempted": 1,
-                "questions_correct": 1 if correct else 0,
-                "questions_wrong": 0 if correct else 1,
-                "duration_min": max(1, time_taken // 60),
-            }},
+            {
+                "$inc": {
+                    "questions_attempted": 1,
+                    "questions_correct": 1 if correct else 0,
+                    "questions_wrong": 0 if correct else 1,
+                    "duration_min": max(1, time_taken // 60),
+                }
+            },
         )
     else:
         log = StudyLog(
-            activity="Practice", subject=q["subject"], topic=q.get("topic", ""),
+            activity="Practice",
+            subject=q["subject"],
+            topic=q.get("topic", ""),
             duration_min=max(1, time_taken // 60),
             questions_attempted=1,
             questions_correct=1 if correct else 0,
@@ -545,7 +659,11 @@ async def submit_practice(payload: Dict[str, Any]):
 @api_router.get("/srs/due")
 async def srs_due(limit: int = 100):
     today = today_iso()
-    due = await db.srs.find({"next_review_date": {"$lte": today}}, {"_id": 0}).sort("next_review_date", 1).to_list(limit)
+    due = (
+        await db.srs.find({"next_review_date": {"$lte": today}}, {"_id": 0})
+        .sort("next_review_date", 1)
+        .to_list(limit)
+    )
     qids = [s["question_id"] for s in due]
     if not qids:
         return {"items": [], "total": 0}
@@ -569,7 +687,9 @@ async def create_log(payload: Dict[str, Any]):
 
 
 @api_router.get("/study-logs")
-async def list_logs(start: Optional[str] = None, end: Optional[str] = None, limit: int = 1000):
+async def list_logs(
+    start: Optional[str] = None, end: Optional[str] = None, limit: int = 1000
+):
     query: Dict[str, Any] = {}
     if start or end:
         rng = {}
@@ -578,7 +698,11 @@ async def list_logs(start: Optional[str] = None, end: Optional[str] = None, limi
         if end:
             rng["$lte"] = end
         query["date"] = rng
-    docs = await db.study_logs.find(query, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    docs = (
+        await db.study_logs.find(query, {"_id": 0})
+        .sort("created_at", -1)
+        .to_list(limit)
+    )
     return {"items": docs, "total": len(docs)}
 
 
@@ -594,15 +718,22 @@ async def delete_log(log_id: str):
 @api_router.post("/timeline", response_model=TimelineEntry)
 async def create_timeline_entry(payload: Dict[str, Any]):
     payload.setdefault("date", today_iso())
-    entry = TimelineEntry(**{k: v for k, v in payload.items() if k in TimelineEntry.model_fields})
+    entry = TimelineEntry(
+        **{k: v for k, v in payload.items() if k in TimelineEntry.model_fields}
+    )
     await db.timeline.insert_one(entry.model_dump())
 
     # auto-create study log unless skipped
     if not payload.get("skip_log", False):
         log = StudyLog(
-            activity=entry.activity, subject=entry.subject, topic=entry.topic,
-            duration_min=entry.duration_min, questions_attempted=entry.questions_solved,
-            remarks=entry.title, date=entry.date, timeline_entry_id=entry.id,
+            activity=entry.activity,
+            subject=entry.subject,
+            topic=entry.topic,
+            duration_min=entry.duration_min,
+            questions_attempted=entry.questions_solved,
+            remarks=entry.title,
+            date=entry.date,
+            timeline_entry_id=entry.id,
         )
         await db.study_logs.insert_one(log.model_dump())
 
@@ -610,7 +741,9 @@ async def create_timeline_entry(payload: Dict[str, Any]):
 
 
 @api_router.get("/timeline")
-async def list_timeline(start: Optional[str] = None, end: Optional[str] = None, limit: int = 1000):
+async def list_timeline(
+    start: Optional[str] = None, end: Optional[str] = None, limit: int = 1000
+):
     query: Dict[str, Any] = {}
     if start or end:
         rng = {}
@@ -625,9 +758,13 @@ async def list_timeline(start: Optional[str] = None, end: Optional[str] = None, 
     # (so revisions scheduled in this range show up even if parent entry was outside).
     parent_for_scheduling: List[dict] = []
     if start or end:
-        sched_query: Dict[str, Any] = {"scheduled_revisions": {"$exists": True, "$ne": []}}
+        sched_query: Dict[str, Any] = {
+            "scheduled_revisions": {"$exists": True, "$ne": []}
+        }
         if start and end:
-            sched_query["scheduled_revisions"] = {"$elemMatch": {"$gte": start, "$lte": end}}
+            sched_query["scheduled_revisions"] = {
+                "$elemMatch": {"$gte": start, "$lte": end}
+            }
         elif start:
             sched_query["scheduled_revisions"] = {"$elemMatch": {"$gte": start}}
         elif end:
@@ -649,22 +786,24 @@ async def list_timeline(start: Optional[str] = None, end: Optional[str] = None, 
             if end and rd > end:
                 continue
             if rd not in e.get("completed_revisions", []):
-                scheduled.append({
-                    "id": f"rev-{e['id']}-{rd}",
-                    "parent_id": e["id"],
-                    "subject": e["subject"],
-                    "topic": e["topic"],
-                    "activity": "Revision",
-                    "title": f"Revise: {e['title']}",
-                    "date": rd,
-                    "duration_min": 0,
-                    "questions_solved": 0,
-                    "notes": "",
-                    "scheduled_revisions": [],
-                    "completed_revisions": [],
-                    "completion_status": "planned",
-                    "is_virtual": True,
-                })
+                scheduled.append(
+                    {
+                        "id": f"rev-{e['id']}-{rd}",
+                        "parent_id": e["id"],
+                        "subject": e["subject"],
+                        "topic": e["topic"],
+                        "activity": "Revision",
+                        "title": f"Revise: {e['title']}",
+                        "date": rd,
+                        "duration_min": 0,
+                        "questions_solved": 0,
+                        "notes": "",
+                        "scheduled_revisions": [],
+                        "completed_revisions": [],
+                        "completion_status": "planned",
+                        "is_virtual": True,
+                    }
+                )
     return {"items": docs, "scheduled_revisions": scheduled, "total": len(docs)}
 
 
@@ -679,7 +818,9 @@ async def get_timeline_entry(entry_id: str):
 @api_router.put("/timeline/{entry_id}")
 async def update_timeline_entry(entry_id: str, payload: Dict[str, Any]):
     update = {k: v for k, v in payload.items() if v is not None}
-    res = await db.timeline.find_one_and_update({"id": entry_id}, {"$set": update}, return_document=True)
+    res = await db.timeline.find_one_and_update(
+        {"id": entry_id}, {"$set": update}, return_document=True
+    )
     if not res:
         raise HTTPException(404)
     return strip_id(res)
@@ -706,7 +847,9 @@ async def schedule_revision(entry_id: str, payload: Dict[str, Any]):
         raise HTTPException(404)
     rev = list(set(e.get("scheduled_revisions", []) + [rev_date]))
     rev.sort()
-    await db.timeline.update_one({"id": entry_id}, {"$set": {"scheduled_revisions": rev}})
+    await db.timeline.update_one(
+        {"id": entry_id}, {"$set": {"scheduled_revisions": rev}}
+    )
     return {"scheduled_revisions": rev}
 
 
@@ -717,11 +860,17 @@ async def complete_revision(entry_id: str, payload: Dict[str, Any]):
     if not e:
         raise HTTPException(404)
     completed = list(set(e.get("completed_revisions", []) + [rev_date]))
-    await db.timeline.update_one({"id": entry_id}, {"$set": {"completed_revisions": completed}})
+    await db.timeline.update_one(
+        {"id": entry_id}, {"$set": {"completed_revisions": completed}}
+    )
     # auto-log
     log = StudyLog(
-        activity="Revision", subject=e["subject"], topic=e["topic"],
-        duration_min=0, remarks=f"Revised: {e['title']}", timeline_entry_id=entry_id,
+        activity="Revision",
+        subject=e["subject"],
+        topic=e["topic"],
+        duration_min=0,
+        remarks=f"Revised: {e['title']}",
+        timeline_entry_id=entry_id,
     )
     await db.study_logs.insert_one(log.model_dump())
     return {"completed_revisions": completed}
@@ -735,7 +884,9 @@ async def create_revisit(payload: Dict[str, Any]):
         payload["revisit_date"] = (date.today() + timedelta(days=days)).isoformat()
     if payload.get("item_type") not in REVISIT_TYPES:
         raise HTTPException(400, f"Invalid item_type. Use one of {REVISIT_TYPES}")
-    r = RevisitItem(**{k: v for k, v in payload.items() if k in RevisitItem.model_fields})
+    r = RevisitItem(
+        **{k: v for k, v in payload.items() if k in RevisitItem.model_fields}
+    )
     await db.revisits.insert_one(r.model_dump())
     return r
 
@@ -763,7 +914,9 @@ async def list_revisits(
         if end:
             rng["$lte"] = end
         query["revisit_date"] = rng
-    docs = await db.revisits.find(query, {"_id": 0}).sort("revisit_date", 1).to_list(2000)
+    docs = (
+        await db.revisits.find(query, {"_id": 0}).sort("revisit_date", 1).to_list(2000)
+    )
     return {"items": docs, "total": len(docs)}
 
 
@@ -790,8 +943,12 @@ async def delete_revisit(rid: str):
 # ============================ CALENDAR / PULSE =====================
 async def _aggregate_day(d_iso: str) -> dict:
     logs = await db.study_logs.find({"date": d_iso}, {"_id": 0}).to_list(1000)
-    revisits_completed = await db.revisits.count_documents({"completed": True, "completed_at": {"$regex": f"^{d_iso}"}})
-    revisits_pending = await db.revisits.count_documents({"completed": False, "revisit_date": d_iso})
+    revisits_completed = await db.revisits.count_documents(
+        {"completed": True, "completed_at": {"$regex": f"^{d_iso}"}}
+    )
+    revisits_pending = await db.revisits.count_documents(
+        {"completed": False, "revisit_date": d_iso}
+    )
     timeline_count = await db.timeline.count_documents({"date": d_iso})
     scheduled_today = 0
     async for _e in db.timeline.find({"scheduled_revisions": d_iso}, {"_id": 0}):
@@ -869,7 +1026,9 @@ async def pulse():
                 due_timeline_revs += 1
     due_revisions_total = due_srs + due_timeline_revs
     # Due revisits
-    due_revisits = await db.revisits.count_documents({"completed": False, "revisit_date": {"$lte": today}})
+    due_revisits = await db.revisits.count_documents(
+        {"completed": False, "revisit_date": {"$lte": today}}
+    )
 
     # Today's logs
     today_logs = await db.study_logs.find({"date": today}, {"_id": 0}).to_list(1000)
@@ -880,7 +1039,9 @@ async def pulse():
     # Group last-30-day attempts by (subject, topic). A bucket is "weak" if it has
     # at least 3 attempts AND accuracy < 70%. Top 3 weakest are surfaced.
     cutoff = (date.today() - timedelta(days=30)).isoformat()
-    recent_attempts = await db.attempts.find({"created_at": {"$gte": cutoff}}, {"_id": 0}).to_list(50000)
+    recent_attempts = await db.attempts.find(
+        {"created_at": {"$gte": cutoff}}, {"_id": 0}
+    ).to_list(50000)
     if recent_attempts:
         qids = list({a["question_id"] for a in recent_attempts})
         qs = await db.questions.find({"id": {"$in": qids}}, {"_id": 0}).to_list(10000)
@@ -891,7 +1052,15 @@ async def pulse():
             if not q:
                 continue
             key = f"{q['subject']}::{q.get('topic','') or 'General'}"
-            d = agg.setdefault(key, {"subject": q["subject"], "topic": q.get("topic", "") or "General", "total": 0, "correct": 0})
+            d = agg.setdefault(
+                key,
+                {
+                    "subject": q["subject"],
+                    "topic": q.get("topic", "") or "General",
+                    "total": 0,
+                    "correct": 0,
+                },
+            )
             d["total"] += 1
             d["correct"] += 1 if a["correct"] else 0
         weak_topics = []
@@ -913,32 +1082,62 @@ async def pulse():
     for s in SUBJECTS:
         total = await db.questions.count_documents({"subject": s})
         if total == 0:
-            subject_completion.append({"subject": s, "total": 0, "completed": 0, "percent": 0})
+            subject_completion.append(
+                {"subject": s, "total": 0, "completed": 0, "percent": 0}
+            )
             continue
-        ids = [q["id"] async for q in db.questions.find({"subject": s}, {"_id": 0, "id": 1})]
-        srs_records = await db.srs.find({"question_id": {"$in": ids}}, {"_id": 0}).to_list(10000)
+        ids = [
+            q["id"]
+            async for q in db.questions.find({"subject": s}, {"_id": 0, "id": 1})
+        ]
+        srs_records = await db.srs.find(
+            {"question_id": {"$in": ids}}, {"_id": 0}
+        ).to_list(10000)
         completed = sum(1 for s_rec in srs_records if _is_question_completed(s_rec))
         overall_total += total
         overall_completed += completed
-        subject_completion.append({
-            "subject": s, "total": total, "completed": completed,
-            "percent": round(completed / total * 100, 1),
-        })
-    overall_completion_percent = round(overall_completed / overall_total * 100, 1) if overall_total else 0
+        subject_completion.append(
+            {
+                "subject": s,
+                "total": total,
+                "completed": completed,
+                "percent": round(completed / total * 100, 1),
+            }
+        )
+    overall_completion_percent = (
+        round(overall_completed / overall_total * 100, 1) if overall_total else 0
+    )
 
     # PYQ completion
     pyq_total = await db.questions.count_documents({"year": {"$ne": None}})
-    pyq_attempted_ids = list({a["question_id"] for a in await db.attempts.find({}, {"_id": 0, "question_id": 1}).to_list(50000)})
-    pyq_done = await db.questions.count_documents({"year": {"$ne": None}, "id": {"$in": pyq_attempted_ids}}) if pyq_attempted_ids else 0
+    pyq_attempted_ids = list(
+        {
+            a["question_id"]
+            for a in await db.attempts.find({}, {"_id": 0, "question_id": 1}).to_list(
+                50000
+            )
+        }
+    )
+    pyq_done = (
+        await db.questions.count_documents(
+            {"year": {"$ne": None}, "id": {"$in": pyq_attempted_ids}}
+        )
+        if pyq_attempted_ids
+        else 0
+    )
     pyq_percent = round((pyq_done / pyq_total) * 100, 1) if pyq_total else 0
 
     # Revision readiness: % of due revisions completed in last 7d
     last_7 = [(date.today() - timedelta(days=i)).isoformat() for i in range(7)]
-    completed_rev_7 = await db.study_logs.count_documents({"activity": "Revision", "date": {"$in": last_7}})
+    completed_rev_7 = await db.study_logs.count_documents(
+        {"activity": "Revision", "date": {"$in": last_7}}
+    )
     revision_readiness = min(100, completed_rev_7 * 10)
 
     # Mock readiness: 50% of average subject completion + 50% mock activity ratio
-    avg_sub = sum(s["percent"] for s in subject_completion) / max(1, len([s for s in subject_completion if s["total"] > 0]))
+    avg_sub = sum(s["percent"] for s in subject_completion) / max(
+        1, len([s for s in subject_completion if s["total"] > 0])
+    )
     mock_count = await db.study_logs.count_documents({"activity": "Mock Test"})
     mock_readiness = round(min(100, avg_sub * 0.6 + min(40, mock_count * 5)), 1)
 
@@ -947,32 +1146,73 @@ async def pulse():
     # Today's Mission (max 4) — prioritized: due revisions, due revisits, weak topics, new practice
     mission = []
     if due_revisions_total > 0:
-        mission.append({"id": "due-rev", "title": f"Complete {min(due_revisions_total, settings['daily_revision_target'])} due revisions", "count": due_revisions_total, "kind": "due_revisions"})
+        mission.append(
+            {
+                "id": "due-rev",
+                "title": f"Complete {min(due_revisions_total, settings['daily_revision_target'])} due revisions",
+                "count": due_revisions_total,
+                "kind": "due_revisions",
+            }
+        )
     if due_revisits > 0:
-        mission.append({"id": "due-revisit", "title": f"Tackle {due_revisits} revisit items", "count": due_revisits, "kind": "due_revisits"})
+        mission.append(
+            {
+                "id": "due-revisit",
+                "title": f"Tackle {due_revisits} revisit items",
+                "count": due_revisits,
+                "kind": "due_revisits",
+            }
+        )
     if weak_topics:
         w = weak_topics[0]
-        mission.append({"id": "weak", "title": f"Practice 10 {w['subject']} questions ({w['topic']})", "subject": w["subject"], "topic": w["topic"], "kind": "weak_topic"})
+        mission.append(
+            {
+                "id": "weak",
+                "title": f"Practice 10 {w['subject']} questions ({w['topic']})",
+                "subject": w["subject"],
+                "topic": w["topic"],
+                "kind": "weak_topic",
+            }
+        )
     if len(mission) < 4:
         # New practice in least-completed subject
-        weakest = sorted([s for s in subject_completion if s["total"] > 0], key=lambda x: x["percent"])
+        weakest = sorted(
+            [s for s in subject_completion if s["total"] > 0],
+            key=lambda x: x["percent"],
+        )
         if weakest:
             s0 = weakest[0]
-            mission.append({"id": "new", "title": f"Solve {settings['daily_question_target']} new {s0['subject']} questions", "subject": s0["subject"], "kind": "new_practice"})
+            mission.append(
+                {
+                    "id": "new",
+                    "title": f"Solve {settings['daily_question_target']} new {s0['subject']} questions",
+                    "subject": s0["subject"],
+                    "kind": "new_practice",
+                }
+            )
     mission = mission[:4]
 
     # GATE Readiness
     exam_date = settings["exam_date"]
-    days_until = max(0, (datetime.strptime(exam_date, "%Y-%m-%d").date() - date.today()).days)
+    days_until = max(
+        0, (datetime.strptime(exam_date, "%Y-%m-%d").date() - date.today()).days
+    )
 
     # Daily progress
-    daily_q_pct = round(min(100, today_qs / max(1, settings["daily_question_target"]) * 100), 1)
-    daily_m_pct = round(min(100, today_minutes / max(1, settings["daily_study_minutes_target"]) * 100), 1)
+    daily_q_pct = round(
+        min(100, today_qs / max(1, settings["daily_question_target"]) * 100), 1
+    )
+    daily_m_pct = round(
+        min(100, today_minutes / max(1, settings["daily_study_minutes_target"]) * 100),
+        1,
+    )
 
     # User-managed Mission tasks (separate from AI/system-recommended mission)
-    user_missions = await db.user_missions.find(
-        {}, {"_id": 0}
-    ).sort([("completed", 1), ("order", 1), ("created_at", 1)]).to_list(50)
+    user_missions = (
+        await db.user_missions.find({}, {"_id": 0})
+        .sort([("completed", 1), ("order", 1), ("created_at", 1)])
+        .to_list(50)
+    )
 
     return {
         "today": today,
@@ -1010,9 +1250,11 @@ async def pulse():
 # ============================ USER MISSIONS ========================
 @api_router.get("/user-missions")
 async def list_user_missions():
-    docs = await db.user_missions.find({}, {"_id": 0}).sort(
-        [("completed", 1), ("order", 1), ("created_at", 1)]
-    ).to_list(200)
+    docs = (
+        await db.user_missions.find({}, {"_id": 0})
+        .sort([("completed", 1), ("order", 1), ("created_at", 1)])
+        .to_list(200)
+    )
     return {"items": docs, "total": len(docs)}
 
 
@@ -1026,14 +1268,20 @@ async def create_user_mission(payload: Dict[str, Any]):
             {"completed": False}, {"_id": 0}, sort=[("order", -1)]
         )
         payload["order"] = (last["order"] + 1) if last else 0
-    item = UserMission(**{k: v for k, v in payload.items() if k in UserMission.model_fields})
+    item = UserMission(
+        **{k: v for k, v in payload.items() if k in UserMission.model_fields}
+    )
     await db.user_missions.insert_one(item.model_dump())
     return item
 
 
 @api_router.put("/user-missions/{mid}")
 async def update_user_mission(mid: str, payload: Dict[str, Any]):
-    update = {k: v for k, v in payload.items() if k in UserMission.model_fields and v is not None}
+    update = {
+        k: v
+        for k, v in payload.items()
+        if k in UserMission.model_fields and v is not None
+    }
     if not update:
         raise HTTPException(400, "No fields to update")
     # If toggling completion, stamp the timestamp
@@ -1041,7 +1289,9 @@ async def update_user_mission(mid: str, payload: Dict[str, Any]):
         update["completed_at"] = now_iso() if update["completed"] else None
     update["updated_at"] = now_iso()
     res = await db.user_missions.find_one_and_update(
-        {"id": mid}, {"$set": update}, return_document=True,
+        {"id": mid},
+        {"$set": update},
+        return_document=True,
     )
     if not res:
         raise HTTPException(404, "Mission not found")
@@ -1062,7 +1312,8 @@ async def reorder_user_missions(payload: Dict[str, List[str]]):
     ids = payload.get("ids", [])
     for idx, mid in enumerate(ids):
         await db.user_missions.update_one(
-            {"id": mid}, {"$set": {"order": idx, "updated_at": now_iso()}},
+            {"id": mid},
+            {"$set": {"order": idx, "updated_at": now_iso()}},
         )
     return {"reordered": len(ids)}
 
@@ -1071,7 +1322,9 @@ async def reorder_user_missions(payload: Dict[str, List[str]]):
 @api_router.get("/mistakes")
 async def mistakes(mode: str = "all"):
     """mode: wrong_today | frequently_wrong | forgotten | bookmarked_mistakes | all"""
-    all_attempts = await db.attempts.find({}, {"_id": 0}).sort("created_at", -1).to_list(20000)
+    all_attempts = (
+        await db.attempts.find({}, {"_id": 0}).sort("created_at", -1).to_list(20000)
+    )
     today = today_iso()
     by_q: Dict[str, List[dict]] = {}
     for a in all_attempts:
@@ -1079,25 +1332,43 @@ async def mistakes(mode: str = "all"):
 
     result_ids: List[str] = []
     if mode == "wrong_today":
-        result_ids = [qid for qid, atts in by_q.items() if any(not a["correct"] and a["created_at"].startswith(today) for a in atts)]
+        result_ids = [
+            qid
+            for qid, atts in by_q.items()
+            if any(not a["correct"] and a["created_at"].startswith(today) for a in atts)
+        ]
     elif mode == "frequently_wrong":
-        result_ids = [qid for qid, atts in by_q.items()
-                      if sum(1 for a in atts if not a["correct"]) >= 2]
+        result_ids = [
+            qid
+            for qid, atts in by_q.items()
+            if sum(1 for a in atts if not a["correct"]) >= 2
+        ]
     elif mode == "forgotten":
         # latest attempt incorrect and last_reviewed older than 14 days
         srs_all = await db.srs.find({}, {"_id": 0}).to_list(10000)
         cutoff = (date.today() - timedelta(days=14)).isoformat()
         for s in srs_all:
             atts = by_q.get(s["question_id"], [])
-            if atts and not atts[0]["correct"] and s.get("last_reviewed") and s["last_reviewed"] <= cutoff:
+            if (
+                atts
+                and not atts[0]["correct"]
+                and s.get("last_reviewed")
+                and s["last_reviewed"] <= cutoff
+            ):
                 result_ids.append(s["question_id"])
     elif mode == "bookmarked_mistakes":
-        wrong_ids = {qid for qid, atts in by_q.items() if atts and not atts[0]["correct"]}
-        qs = await db.questions.find({"bookmarked": True, "id": {"$in": list(wrong_ids)}}, {"_id": 0}).to_list(2000)
+        wrong_ids = {
+            qid for qid, atts in by_q.items() if atts and not atts[0]["correct"]
+        }
+        qs = await db.questions.find(
+            {"bookmarked": True, "id": {"$in": list(wrong_ids)}}, {"_id": 0}
+        ).to_list(2000)
         return {"items": qs, "total": len(qs)}
     else:
         # all wrong (latest)
-        result_ids = [qid for qid, atts in by_q.items() if atts and not atts[0]["correct"]]
+        result_ids = [
+            qid for qid, atts in by_q.items() if atts and not atts[0]["correct"]
+        ]
 
     if not result_ids:
         return {"items": [], "total": 0}
@@ -1108,16 +1379,27 @@ async def mistakes(mode: str = "all"):
 # ============================ SEED ==================================
 SAMPLE_QUESTIONS = [
     {
-        "subject": "OS", "topic": "Process Synchronization", "year": 2023, "difficulty": "Medium",
+        "subject": "OS",
+        "topic": "Process Synchronization",
+        "year": 2023,
+        "difficulty": "Medium",
         "question_type": "MCQ",
         "statement": "Consider two processes $P_1$ and $P_2$ sharing a critical section guarded by a binary semaphore $S$ initialized to 1. Which of the following is a valid sequence to ensure mutual exclusion?",
-        "options": ["wait(S) ... signal(S)", "signal(S) ... wait(S)", "wait(S) ... wait(S)", "signal(S) ... signal(S)"],
+        "options": [
+            "wait(S) ... signal(S)",
+            "signal(S) ... wait(S)",
+            "wait(S) ... wait(S)",
+            "signal(S) ... signal(S)",
+        ],
         "correct_answer": "A",
         "explanation": "Mutual exclusion is achieved by performing wait(S) before entering and signal(S) after leaving the critical section.",
         "gateoverflow_url": "https://gateoverflow.in/",
     },
     {
-        "subject": "DS", "topic": "Trees", "year": 2022, "difficulty": "Easy",
+        "subject": "DS",
+        "topic": "Trees",
+        "year": 2022,
+        "difficulty": "Easy",
         "question_type": "NAT",
         "statement": "What is the maximum number of nodes in a binary tree of height $h = 4$ (counting root as height 0)?",
         "correct_answer": "31",
@@ -1125,44 +1407,78 @@ SAMPLE_QUESTIONS = [
         "gateoverflow_url": "https://gateoverflow.in/",
     },
     {
-        "subject": "DB", "topic": "Normalization", "year": 2024, "difficulty": "Hard",
+        "subject": "DB",
+        "topic": "Normalization",
+        "year": 2024,
+        "difficulty": "Hard",
         "question_type": "MSQ",
         "statement": "Which of the following decompositions are lossless? Select all that apply.",
-        "options": ["R(A,B,C) into R1(A,B), R2(B,C) with B as key in R1", "R(A,B,C,D) into R1(A,B), R2(C,D)",
-                    "R(A,B,C) into R1(A,B), R2(A,C) with A as key in both", "R(A,B,C) into R1(A,C), R2(B,C)"],
+        "options": [
+            "R(A,B,C) into R1(A,B), R2(B,C) with B as key in R1",
+            "R(A,B,C,D) into R1(A,B), R2(C,D)",
+            "R(A,B,C) into R1(A,B), R2(A,C) with A as key in both",
+            "R(A,B,C) into R1(A,C), R2(B,C)",
+        ],
         "correct_answer": "A,C",
         "explanation": "Lossless decomposition requires the common attribute to be a superkey in at least one relation.",
         "gateoverflow_url": "https://gateoverflow.in/",
     },
     {
-        "subject": "AL", "topic": "Dynamic Programming", "year": 2021, "difficulty": "Medium",
+        "subject": "AL",
+        "topic": "Dynamic Programming",
+        "year": 2021,
+        "difficulty": "Medium",
         "question_type": "MCQ",
         "statement": "The recurrence $T(n) = T(n-1) + T(n-2) + 1$, $T(0)=T(1)=1$ has time complexity?",
-        "options": ["$O(n)$", "$O(n \\log n)$", "$O(2^n)$", "$O(\\phi^n)$ where $\\phi = (1+\\sqrt{5})/2$"],
+        "options": [
+            "$O(n)$",
+            "$O(n \\log n)$",
+            "$O(2^n)$",
+            "$O(\\phi^n)$ where $\\phi = (1+\\sqrt{5})/2$",
+        ],
         "correct_answer": "D",
         "explanation": "This is the Fibonacci recurrence (with +1), exponential in golden ratio $\\phi$.",
         "gateoverflow_url": "https://gateoverflow.in/",
     },
     {
-        "subject": "CN", "topic": "TCP", "year": 2023, "difficulty": "Medium",
+        "subject": "CN",
+        "topic": "TCP",
+        "year": 2023,
+        "difficulty": "Medium",
         "question_type": "MCQ",
         "statement": "TCP uses which mechanism for reliable delivery?",
-        "options": ["Sliding Window with cumulative ACKs", "Stop-and-Wait only", "No ACKs (best-effort)", "Selective Repeat without ACKs"],
+        "options": [
+            "Sliding Window with cumulative ACKs",
+            "Stop-and-Wait only",
+            "No ACKs (best-effort)",
+            "Selective Repeat without ACKs",
+        ],
         "correct_answer": "A",
         "explanation": "TCP uses a sliding window protocol with cumulative acknowledgments for reliable in-order delivery.",
         "gateoverflow_url": "https://gateoverflow.in/",
     },
     {
-        "subject": "TOC", "topic": "Regular Languages", "year": 2020, "difficulty": "Easy",
+        "subject": "TOC",
+        "topic": "Regular Languages",
+        "year": 2020,
+        "difficulty": "Easy",
         "question_type": "MCQ",
         "statement": "Which of the following languages is regular?",
-        "options": ["$\\{a^n b^n : n \\geq 0\\}$", "$\\{a^n b^m : n, m \\geq 0\\}$", "$\\{ww : w \\in \\{a,b\\}^* \\}$", "$\\{a^n : n \\text{ is prime}\\}$"],
+        "options": [
+            "$\\{a^n b^n : n \\geq 0\\}$",
+            "$\\{a^n b^m : n, m \\geq 0\\}$",
+            "$\\{ww : w \\in \\{a,b\\}^* \\}$",
+            "$\\{a^n : n \\text{ is prime}\\}$",
+        ],
         "correct_answer": "B",
         "explanation": "$a^* b^*$ is a regular expression. The others require counting or unbounded memory.",
         "gateoverflow_url": "https://gateoverflow.in/",
     },
     {
-        "subject": "COA", "topic": "Cache", "year": 2022, "difficulty": "Medium",
+        "subject": "COA",
+        "topic": "Cache",
+        "year": 2022,
+        "difficulty": "Medium",
         "question_type": "NAT",
         "statement": "A direct-mapped cache has 64 lines of 16 bytes each. For a 32-bit address, how many bits are used for the tag?",
         "correct_answer": "22",
@@ -1170,7 +1486,10 @@ SAMPLE_QUESTIONS = [
         "gateoverflow_url": "https://gateoverflow.in/",
     },
     {
-        "subject": "DM", "topic": "Sets and Functions", "year": 2024, "difficulty": "Easy",
+        "subject": "DM",
+        "topic": "Sets and Functions",
+        "year": 2024,
+        "difficulty": "Easy",
         "question_type": "MCQ",
         "statement": "If $|A| = 5$ and $|B| = 3$, the number of onto functions from $A$ to $B$ is?",
         "options": ["150", "120", "243", "60"],
@@ -1183,28 +1502,38 @@ SAMPLE_QUESTIONS = [
 
 @api_router.post("/seed-demo")
 async def seed_demo():
-    count = await db.questions.count_documents({})
-    if count > 0:
-        return {"seeded": False, "reason": "questions already exist", "count": count}
-    for s in SAMPLE_QUESTIONS:
-        q = Question(**s)
-        await db.questions.insert_one(q.model_dump())
-        await _ensure_srs(q.id)
-    await _get_settings()  # initialize singleton
-    return {"seeded": True, "count": len(SAMPLE_QUESTIONS)}
+    try:
+        count = await db.questions.count_documents({})
+        if count > 0:
+            return {
+                "seeded": False,
+                "reason": "questions already exist",
+                "count": count,
+            }
+        for s in SAMPLE_QUESTIONS:
+            q = Question(**s)
+            await db.questions.insert_one(q.model_dump())
+            await _ensure_srs(q.id)
+        await _get_settings()  # initialize singleton
+        return {"seeded": True, "count": len(SAMPLE_QUESTIONS)}
+    except Exception as exc:
+        logger.exception("Seed demo failed")
+        raise HTTPException(500, detail=f"Seed demo failed: {exc}")
 
 
 # ============================ MOUNT =================================
 app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_credentials=False,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 

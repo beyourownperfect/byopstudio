@@ -1,9 +1,13 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL =
+  process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8000";
 export const API = `${BACKEND_URL}/api`;
 
-const c = axios.create({ baseURL: API, headers: { "Content-Type": "application/json" } });
+const c = axios.create({
+  baseURL: API,
+  headers: { "Content-Type": "application/json" },
+});
 
 export const metaApi = {
   get: () => c.get("/meta").then((r) => r.data),
@@ -20,8 +24,10 @@ export const questionsApi = {
   create: (data) => c.post("/questions", data).then((r) => r.data),
   update: (id, data) => c.put(`/questions/${id}`, data).then((r) => r.data),
   remove: (id) => c.delete(`/questions/${id}`).then((r) => r.data),
-  bulkDelete: (ids) => c.post("/questions/bulk-delete", { ids }).then((r) => r.data),
-  bulkCreate: (rows) => c.post("/questions/bulk-create", { rows }).then((r) => r.data),
+  bulkDelete: (ids) =>
+    c.post("/questions/bulk-delete", { ids }).then((r) => r.data),
+  bulkCreate: (rows) =>
+    c.post("/questions/bulk-create", { rows }).then((r) => r.data),
 };
 
 export const practiceApi = {
@@ -45,8 +51,10 @@ export const timelineApi = {
   create: (data) => c.post("/timeline", data).then((r) => r.data),
   update: (id, data) => c.put(`/timeline/${id}`, data).then((r) => r.data),
   remove: (id) => c.delete(`/timeline/${id}`).then((r) => r.data),
-  scheduleRevision: (id, data) => c.post(`/timeline/${id}/schedule-revision`, data).then((r) => r.data),
-  completeRevision: (id, data) => c.post(`/timeline/${id}/complete-revision`, data).then((r) => r.data),
+  scheduleRevision: (id, data) =>
+    c.post(`/timeline/${id}/schedule-revision`, data).then((r) => r.data),
+  completeRevision: (id, data) =>
+    c.post(`/timeline/${id}/complete-revision`, data).then((r) => r.data),
 };
 
 export const revisitsApi = {
@@ -57,7 +65,8 @@ export const revisitsApi = {
 };
 
 export const calendarApi = {
-  range: (start, end) => c.get("/calendar", { params: { start, end } }).then((r) => r.data),
+  range: (start, end) =>
+    c.get("/calendar", { params: { start, end } }).then((r) => r.data),
 };
 
 export const pulseApi = {
@@ -73,7 +82,8 @@ export const userMissionsApi = {
   create: (data) => c.post("/user-missions", data).then((r) => r.data),
   update: (id, data) => c.put(`/user-missions/${id}`, data).then((r) => r.data),
   remove: (id) => c.delete(`/user-missions/${id}`).then((r) => r.data),
-  reorder: (ids) => c.post("/user-missions/reorder", { ids }).then((r) => r.data),
+  reorder: (ids) =>
+    c.post("/user-missions/reorder", { ids }).then((r) => r.data),
 };
 
 export const seed = () => c.post("/seed-demo").then((r) => r.data);
