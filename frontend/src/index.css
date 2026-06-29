@@ -113,9 +113,17 @@
   .card-2 {
     @apply bg-[hsl(var(--bg-elev))] rounded-lg;
     border: 2px solid hsl(var(--border));
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  .card-2:hover {
+    box-shadow: 0 0 12px -4px hsl(var(--accent) / 0.08);
   }
   .card-1 {
     @apply bg-[hsl(var(--bg-elev))] rounded-lg border border-[hsl(var(--border))];
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  .card-1:hover {
+    box-shadow: 0 0 8px -3px hsl(var(--accent) / 0.06);
   }
   .chip {
     @apply inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg-muted))];
@@ -125,7 +133,7 @@
   .chip-warning { @apply text-[hsl(var(--warning))] border-[hsl(var(--warning))]/40 bg-[hsl(var(--warning))]/10; }
   .chip-danger { @apply text-[hsl(var(--danger))] border-[hsl(var(--danger))]/40 bg-[hsl(var(--danger))]/10; }
 
-  .btn { @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-elev))] hover:bg-[hsl(var(--bg-elev-2))] active:scale-[0.97] transition-all duration-150; }
+  .btn { @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--bg-elev))] hover:bg-[hsl(var(--bg-elev-2))] hover:border-[hsl(var(--accent))]/30 hover:shadow-[0_0_10px_-3px_hsl(var(--accent)/0.06)] active:scale-[0.97] transition-all duration-150; }
   .btn-primary { @apply bg-[hsl(var(--accent))] text-white border-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/90; }
   .btn-ghost { @apply bg-transparent border-transparent hover:bg-[hsl(var(--bg-elev-2))]; }
   .btn-danger { @apply bg-transparent text-[hsl(var(--danger))] border-[hsl(var(--danger))]/40 hover:bg-[hsl(var(--danger))]/10; }
@@ -139,7 +147,7 @@
 
   .skeleton { @apply bg-[hsl(var(--bg-elev-2))] animate-pulse rounded; }
 
-  .row-hover { @apply hover:bg-[hsl(var(--bg-elev-2))] transition-colors; }
+  .row-hover { @apply hover:bg-[hsl(var(--bg-elev-2))] hover:shadow-[0_0_6px_-2px_hsl(var(--accent)/0.04)] transition-all duration-150; }
 
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { scrollbar-width: none; }
