@@ -1,414 +1,239 @@
-# PROJECT_CONTEXT.md
-**BYOPGateCS.studio — Study Operating System for GATE CSE**
+# BYOPGateCS.studio — Project Context
 
-A single-user web app that replaces a study planner with a closed-loop habit engine: capture questions → solve under SRS → schedule revisions → measure momentum. This document is the single source of truth for any future AI session continuing this project.
-
----
-
-## 1. Project philosophy
-
-- **One source of truth.** Every question, attempt, log and revision lives in MongoDB. No scattered notebooks.
-- **No planning ceremony.** Open Pulse, do Today's Mission, repeat. The system decides what's due, not the human.
-- **Spaced repetition is the substrate.** Mastery is *earned* through correctly answering at progressively longer intervals — not by reading more.
-- **Self-feedback over self-deception.** Confidence captured *with* each attempt; the gap between confidence and correctness is signal.
-- **Local-first feel, server-backed truth.** Optimistic UI everywhere; server is authoritative.
-- **GATE-specific UX.** LaTeX rendering by default. PYQ year is a first-class field. Subjects are GATE's 12 standard subjects, not generic.
+Single-user GATE CS study operating system. Capture questions → solve under SRS → schedule revisions → measure momentum. **v1.0 production-ready.** Deployed as a single Render web service backed by MongoDB Atlas.
 
 ---
 
-## 2. Tech stack
+## 1. Philosophy
+
+- **One source of truth.** Every question, attempt, log, revision lives in MongoDB.
+- **No planning ceremony.** Open Pulse, do Today's Mission, repeat.
+- **Spaced repetition is the substrate.** Mastery earned through correct recall at increasing intervals.
+- **Self-feedback over self-deception.** Confidence captured with each attempt.
+- **Local-first feel, server-backed truth.** Optimistic UI; server is authoritative.
+- **GATE-specific UX.** LaTeX rendering, PYQ year as first-class field, 12 standard GATE subjects.
+
+---
+
+## 2. Tech Stack
 
 | Layer | Choice |
-| ----- | ------ |
-| Frontend | React 19 (CRA + craco), TailwindCSS, Radix UI primitives, lucide-react icons, KaTeX (`react-katex`), react-router-dom v7 |
-| Backend | FastAPI, Motor (async MongoDB), Pydantic v2, Uvicorn (managed by supervisor) |
-| Database | MongoDB (single database `os.environ['DB_NAME']`) |
-| Build/deploy | Render (single web service). FastAPI serves the React build via `StaticFiles`; SPA fallback via catch-all route. MongoDB Atlas for persistence. |
-| Process mgmt | Uvicorn on Render (single process, single port via `$PORT`) |
-| Routing | `/api/*` → FastAPI routes. Everything else → React SPA (served by FastAPI). |
-| Auth | None — single user. |
+|-------|--------|
+| Frontend | React 19 (CRA + craco), TailwindCSS, Radix UI primitives, lucide-react, KaTeX, react-router-dom v7, @tanstack/react-query |
+| Backend | FastAPI, Motor (async MongoDB), Pydantic v2, Uvicorn |
+| Database | MongoDB (single database `byopstudio`) |
+| Build/Deploy | Render single web service + MongoDB Atlas M0 |
 
 ---
 
-## 3. Folder structure
+## 3. Folder Structure
 
-```/app
-├── render.yaml              # Render Blueprint — single-service deploy
-├── DEPLOYMENT.md
-├── .gitignore
+```
+/
 ├── backend/
-│   ├── server.py            # All API routes, models, helpers, seed, StaticFiles for React build
+│   ├── server.py          # All API routes, models, helpers, seed, SPA serving
 │   ├── requirements.txt
-│   ├── pytest.ini
 │   ├── Procfile
-│   ├── tests/               # backend_test.py, test_pre_deploy_review.py
-│   ├── .env.example
-│   └── .env                 # MONGO_URL, DB_NAME, CORS_ORIGINS (gitignored)
+│   ├── tests/
+│   └── .env.example
 ├── frontend/
-│   ├── package.json, craco.config.js, tailwind.config.js, postcss.config.js
-│   ├── .env.example
-│   ├── public/index.html
-│   └── src/
-│       ├── App.js           # Router + routes
-│       ├── index.js, index.css, App.css
-│       ├── components/
-│       │   ├── Layout.jsx               # Header, nav, mobile drawer, countdown
-│       │   ├── JanCountdown.jsx         # Header widget — Jan 1 countdown
-│       │   ├── HelpButton.jsx           # Reusable "?" contextual-help popup
-│       │   ├── Modal.jsx                # Base modal (bottom-sheet on mobile)
-│       │   ├── QuestionFormModal.jsx    # Create/Edit question
-│       │   ├── QuestionDetailsModal.jsx # Read-only details (LaTeX + history)
-│       │   ├── TimelineEntryModal.jsx   # Timeline entry + schedule revisions
-│       │   ├── CommandPalette.jsx       # Cmd/Ctrl-K
-│       │   ├── RevisitMenu.jsx          # Schedule revisit on any item
-│       │   ├── Latex.jsx                # Inline + display math rendering
-│       │   └── ui/                      # shadcn-style Radix wrappers (full set)
-│       ├── pages/
-│       │   ├── Pulse.jsx        # Dashboard: mission, momentum, weakness, readiness
-│       │   ├── Repository.jsx   # Question bank (CRUD, sort, filter, bulk, CSV)
-│       │   ├── Practice.jsx     # SRS-driven solve session
-│       │   ├── Bookmarks.jsx, Mistakes.jsx
-│       │   ├── Log.jsx          # Stopwatch + journal + session history
-│       │   └── Timeline.jsx     # Daily/Weekly/Monthly calendar + revisions
-│       ├── lib/
-│       │   ├── api.js           # axios client, all endpoint wrappers
-│       │   ├── helpContent.js   # Per-module help copy
-│       │   ├── dateUtils.js     # ISO date helpers, debounce
-│       │   ├── constants.js     # SUBJECTS, ACTIVITIES, TID test-ids
-│       │   └── utils.js
-│       └── constants/testIds/   # legacy test-id constants
-├── memory/PRD.md
-├── PROJECT_CONTEXT.md           # ← this file
-├── README.md
-├── HOW_TO_CODE_THIS_PROJECT.txt
-└── .gitignore
+│   ├── src/
+│   │   ├── pages/          # 7 pages: Pulse, Repository, Practice, Bookmarks, Mistakes, Log, Timeline
+│   │   ├── components/     # 15 components: Layout, Modal, LectureTable, StudyTimer, MissionCard, etc.
+│   │   ├── lib/            # api.js, constants.js, dateUtils.js, helpContent.js
+│   │   └── index.css       # Tailwind + custom properties + component classes
+│   ├── build/              # Production build (served by FastAPI)
+│   └── package.json
+├── memory/                 # PRD, notes
+└── render.yaml             # Render Blueprint
 ```
 
 ---
 
-## 4. Database schema (MongoDB collections)
+## 4. Database Schema (MongoDB Collections)
 
-All IDs are `str` UUIDs (not ObjectId) so they're JSON-safe.
+### questions
+`{ id, subject, topic, exam_source, year, difficulty, question_type, statement, options[], correct_answer, explanation, gateoverflow_url, bookmarked, notes, created_at, updated_at }`
 
-### `questions`
-| field | type | notes |
-| ----- | ---- | ----- |
-| id | string (uuid) | primary id |
-| subject | string | one of 12 SUBJECTS |
-| topic | string | freeform |
-| question_type | "MCQ" \| "MSQ" \| "NAT" | |
-| statement | string | LaTeX supported via `$...$` and `$$...$$` |
-| options | string[] | empty for NAT |
-| correct_answer | string | MCQ: letter ("A"); MSQ: "A,C"; NAT: numeric string |
-| explanation, gateoverflow_url, notes | string | |
-| year | int \| null | PYQ year |
-| difficulty | "Easy" \| "Medium" \| "Hard" | |
-| bookmarked | bool | |
-| created_at, updated_at | ISO datetime str | |
+### attempts
+`{ id, question_id, correct, confidence(1-5), user_answer, time_taken_sec, created_at }`
 
-### `srs` (one per question)
-| field | type | notes |
-| ----- | ---- | ----- |
-| id, question_id | string | |
-| interval_idx | int | index into `[1,3,7,14,30,90]` days |
-| next_review_date | "YYYY-MM-DD" | |
-| last_reviewed | "YYYY-MM-DD" \| null | |
-| total_attempts, correct_attempts, consecutive_correct | int | |
+### srs
+`{ id, question_id, interval_idx(0-5), next_review_date, last_reviewed, total_attempts, correct_attempts, created_at }`
 
-### `attempts`
-| question_id, correct, confidence (1–5), user_answer, time_taken_sec, created_at |
+### study_logs
+`{ id, activity, subject, topic, duration_min, questions_attempted, questions_correct, questions_wrong, remarks, date, timeline_entry_id, created_at }`
+- `auto: true` set on practice auto-logs (extra field, not in Pydantic model)
 
-### `study_logs`
-| activity, subject, topic, duration_min, questions_attempted/correct/wrong, remarks (journal), date ("YYYY-MM-DD"), timeline_entry_id?, auto?: bool |
+### timeline
+`{ id, subject, topic, activity, title, duration_min, questions_solved, notes, date, scheduled_revisions[], completed_revisions[], completion_status, created_at }`
 
-### `timeline`
-| subject, topic, activity, title, duration_min, questions_solved, notes, date, scheduled_revisions: string[], completed_revisions: string[], completion_status |
+### revisits
+`{ id, item_type, item_id, item_title, item_subject, revisit_date, completed, created_at }`
 
-### `revisits`
-| item_type (REVISIT_TYPES), item_id, item_title, item_subject, revisit_date, completed, completed_at, created_at |
+### lectures
+`{ id, subject, topic, lecture_name, lecture_number, duration_min, completion_percent(0-100), notes_done, revision_done, created_at, updated_at }`
 
-### `settings` (singleton, `id="singleton"`)
-| exam_date ("YYYY-MM-DD"), daily_question_target, daily_revision_target, daily_study_minutes_target |
+### settings
+`{ id: "singleton", exam_date, daily_question_target, daily_revision_target, daily_study_minutes_target }`
+- Default exam_date: `"2027-02-07"` (auto-advances if past)
 
-**Constants** (`backend/server.py` and `frontend/src/lib/constants.js`)
-- `SUBJECTS = ["C","DS","AL","OS","DB","COA","TOC","CD","DL","EM","DM","CN"]`
-- `ACTIVITIES = ["Lecture","Practice","Revision","Mock Test","Reading"]`
-- `SRS_INTERVALS = [1, 3, 7, 14, 30, 90]` (days)
-- `REVISIT_PRESETS = [1, 3, 7, 14, 30]` (days, frontend only)
+### subject_completion
+`{ id, subject, topic, lectures_completed, notes_created, flashcards_created, pyqs_completed, revision_completed, subject_test_completed, dpp_completed, weekly_quiz_completed, can_explain_without_notes, created_at, updated_at }`
+
+### user_missions
+`{ id, title, notes, order, completed, completed_at, created_at, updated_at }`
 
 ---
 
-## 5. Core workflows
+## 5. SRS Algorithm
 
-### Add → Solve → Revise loop (the engine)
-1. Add a question in **Repository** (or import CSV).
-2. Open **Practice** with a mode (`due` / `new` / `wrong` / `weak` / `bookmarked` / `all`).
-3. Set confidence (1–5), submit. SRS updates `interval_idx`, `next_review_date`, mastery.
-4. **Pulse** surfaces the count of due revisions tomorrow → completes the loop.
-
-### Plan → Log → Schedule revision (the calendar)
-1. **Log** a session with stopwatch + journal note OR open **Timeline** and add an entry (Lecture/Reading/etc.).
-2. In the entry modal, schedule +1d / +7d / custom-date revisions.
-3. Scheduled revisions appear on their target date in Timeline, in Pulse's `due_revisions`, and in Today's Mission.
-4. Complete the revision from the entry modal → auto-logs a Revision study session.
-
-### Detail → Edit → Practice (the inspector)
-- Double-click a row in Repository → **Question Details Modal** (rendered LaTeX, attempts history, mastery bar, next-review, GateOverflow link, Edit and Practice buttons).
+Intervals: 1, 3, 7, 14, 30, 90 days.
+Mastery formula: `0.6 × interval_pct + 0.4 × accuracy` (0-100).
+Question is "completed" when `interval_idx >= 3 AND correct_attempts >= 3`.
 
 ---
 
-## 6. Navigation
+## 6. API Routes
 
-Top nav:
-
-| Tab | Path | Purpose |
-| --- | ---- | ------- |
-| **SOLVE** | `/solve/repository` | Repository → Practice → Bookmarks → Mistakes (sub-nav) |
-| **PULSE** | `/pulse` | Dashboard, default landing |
-| **LOG** | `/log` | Stopwatch + manual entries + journal |
-| **TIMELINE** | `/timeline` | Calendar + revision scheduling |
-
-Header also shows:
-- App brand
-- **Jan-1 countdown** widget (`Nd : NNh : NNm`, updates every 30s)
-- Cmd/Ctrl-K command palette trigger
-- Mobile hamburger drawer (≤ md breakpoint)
-
-Sub-nav (Solve): Repository / Practice / Bookmarks / Mistakes.
-
-Default route: `/` → `/pulse`. Unknown route → `/pulse`.
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/` | Health check |
+| GET/POST/PUT/DELETE | `/api/questions[/{id}]` | CRUD + `?subject=&search=&filter_mode=` |
+| POST | `/api/questions/bulk-create` | CSV import |
+| POST | `/api/questions/bulk-delete` | Multi-select delete |
+| POST | `/api/practice/submit` | Submit answer → updates SRS + auto-creates study_log |
+| GET | `/api/practice/next` | Fetch next question for given mode/subject |
+| GET | `/api/pulse` | Full dashboard data |
+| GET/POST/PUT/DELETE | `/api/study-logs[/{id}]` | Manual log CRUD |
+| GET/POST/PUT/DELETE | `/api/timeline[/{id}]` | Timeline entries |
+| POST | `/api/timeline/{id}/complete-revision` | Complete a scheduled revision |
+| GET/POST/DELETE | `/api/revisits[/{id}]` | Revisit items |
+| POST | `/api/revisits/{id}/complete` | Mark revisit complete |
+| GET | `/api/calendar` | Aggregated daily study data |
+| GET | `/api/mistakes` | Wrong answers by mode |
+| GET/POST/PUT/DELETE | `/api/lectures[/{id}]` | Lecture CRUD |
+| GET/POST/PUT | `/api/subject-completion` | Subject completion checklist |
+| GET/POST/PUT/DELETE | `/api/user-missions[/{id}]` | User-authored mission tasks |
+| POST | `/api/user-missions/reorder` | Drag-to-reorder missions |
+| GET/PUT | `/api/settings` | Singleton settings |
+| POST | `/api/seed-demo` | Seed 12 sample questions (one per subject) |
+| GET | `/api/meta` | Counts and metadata |
 
 ---
 
-## 7. Feature list
-
-### Repository (`/solve/repository`)
-- CRUD with LaTeX-aware fields, year, difficulty, options, GateOverflow link, notes, bookmark.
-- Search (debounced 220ms), Subject filter, 8 filter modes (Due today, Revisit today, Bookmarked, Wrong, Weak, Never attempted, Mastered, All).
-- **Column sorting** (subject / type / statement / mastery / next-rev / next-revisit) — click header to toggle asc/desc.
-- **Remembered filters/sort** via `localStorage` key `byop.repo.filters.v1`. URL also reflects subject + filter.
-- Multi-select with bulk delete + undo toast (5s window).
-- CSV Import / Export.
-- Per-row: bookmark toggle, practice, revisit menu (custom date or preset), edit, delete, GateOverflow open.
-- **Double-click row → Question Details Modal** (single-click does nothing — keeps row clean).
-
-### Question Details Modal
-- Rendered LaTeX statement, options (correct highlighted), explanation.
-- Mastery 0–100 with color-coded progress bar.
-- Stats: total attempts, correct, streak, next-review (relative).
-- Attempts history (last 50) with answer, confidence, time, date.
-- Notes, last-reviewed timestamp.
-- GateOverflow link, Bookmark toggle, Revisit menu, Edit, Practice.
-
-### Practice (`/solve/practice`)
-- Modes: `due`, `new`, `wrong`, `weak`, `bookmarked`, `all`; subject filter.
-- Stopwatch (per question), Confidence 1–5 selector, Submit.
-- Feedback card: correct/wrong, mastery, next-review, explanation, GateOverflow, Bookmark, Revisit, Next.
-- LaTeX in statement, options, explanation. NAT handled with float tolerance < 0.01.
-- Auto-logs each attempt into today's Practice `study_log` (aggregated per subject).
+## 7. Frontend Pages
 
 ### Pulse (`/pulse`)
-- Today's Mission (top 4 prioritized actions, clickable → deep-link).
-- Momentum 0–100 (7-day rolling).
-- Due Today: SRS revisions + Timeline-scheduled revisions + Revisits.
-- Today's progress: Questions / Minutes vs daily targets (settings).
-- Weak Topics (Weakness Engine output).
-- GATE Readiness: PYQ %, Revision readiness, Mock readiness.
-- Subject Completion: per-subject mastery >= 60 percentage.
-- GATE-in countdown + Settings (editable exam date + daily targets).
+Dashboard with **Today** section (MissionCard, Momentum, Due Today, Today's Progress), **Readiness** section (PreparationSnapshot, WeakTopics, SubjectCompletion), and **Lectures** section (LectureTable). StudyTimer in header. GATE countdown and settings modal. Card-2 headers with box-shadow depth and section dividers.
+
+### Repository (`/solve/repository`)
+Question bank with inline-editable grid table. 8 columns: checkbox, subject, type, statement (plain-text truncated for uniform row height), mastery bar, next revision, revisit, actions. Filter by subject/mode, search, sort, CSV import/export, bulk delete with undo, OCR prompt modal.
+
+### Practice (`/solve/practice`)
+Setup screen (mode + subject picker) → Active solving with MCQ/MSQ/NAT. Confidence 1-5, stopwatch, feedback with explanation, bookmark, revisit scheduling. Queue navigation with prev/next. Auto-creates study_logs via `POST /api/practice/submit` that batches one log per subject per day.
+
+### Bookmarks (`/solve/bookmarks`)
+Starred questions in a list. Subject badge, mastery, statement, next review. Quick actions: unstar, practice, revisit, GateOverflow link.
+
+### Mistakes (`/solve/mistakes`)
+Wrong answers by 5 modes: All wrong, Wrong today, Frequently wrong (2+), Forgotten, Bookmarked mistakes. Filter, practice-all button.
 
 ### Log (`/log`)
-- **Large live stopwatch** (Space = start/pause, R = reset, N = open log modal).
-- Subject / Activity / Topic + **Journal note** field — saved as a `study_log` on Save.
-- View toggles: daily / weekly / monthly.
-- **Summary**: total time, sessions, questions, accuracy, active subjects.
-- Per-session row: activity, subject, topic, duration, ratio, delete.
-- Modal form: full session details for backfill / manual logs.
+Live stopwatch (Space=pause, R=reset, N=new log) with subject/activity/topic/journal. Session summary cards. Daily/weekly/monthly views with collapsible date groups. **LectureTable** (shared component) and **SubjectCompletion** checklist below.
 
 ### Timeline (`/timeline`)
-- Daily / Weekly (7-day card row with scroll) / Monthly (heatmap-style grid + sidebar day detail).
-- Each cell shows: activity count, study minutes, color-coded bars (study / scheduled rev / revisit).
-- Entry modal:
-  - All fields (date, subject, activity, title, topic, duration, qs solved, notes, completion_status).
-  - **Schedule revisions**: preset +1d/+3d/+7d/+14d/+30d or custom date.
-  - **Complete revisions**: per scheduled date, with auto-log.
-  - Revisit menu (schedule this timeline_entry for future review).
-
-### Bookmarks (`/solve/bookmarks`) and Mistakes (`/solve/mistakes`)
-- Filtered views with quick Practice / Revisit / GateOverflow.
-
-### Cross-cutting
-- **Help (?) button** on every major module — `HelpButton` component, content in `lib/helpContent.js`.
-- Toast: undo bulk delete.
-- Cmd/Ctrl-K command palette.
-- LaTeX everywhere via `<Latex>` (KaTeX).
-- Empty states + skeletons on every page.
-- Responsive: hamburger drawer, bottom-sheet modals, horizontal-scroll tables on small screens.
+Daily/weekly/monthly calendar of entries, scheduled revisions, and revisits. New entry modal with revision scheduling presets (+1d/+3d/+7d/+14d/+30d).
 
 ---
 
-## 8. Algorithms
+## 8. Shared Components
 
-### 8.1 SRS (Spaced Repetition)
-`backend/server.py — submit_practice + _ensure_srs`
-
-- Intervals (days): `[1, 3, 7, 14, 30, 90]`
-- On a **correct** attempt: `interval_idx = min(idx+1, 5)`, `consecutive_correct += 1`
-- On a **wrong** attempt: `interval_idx = 0`, `consecutive_correct = 0`
-- `next_review_date = today + intervals[interval_idx]`
-- Counters: `total_attempts`, `correct_attempts`.
-
-### 8.2 Mastery score
-`_compute_mastery(srs) ∈ [0, 100]`
-
-```
-acc          = correct / total                        # 0..1
-interval_pct = (interval_idx / 5) * 100               # 0..100
-mastery      = min(100, 0.6 * interval_pct + 40 * acc)
-```
-
-Bands used in UI: `< 40` weak (red), `40–79` developing (amber), `>= 80` mastered (green).
-
-### 8.3 Momentum (0–100, 7-day rolling)
-`_momentum_score`
-
-```
-active_days       = distinct dates in study_logs over last 7 days
-subjects_touched  = distinct subjects logged
-qs                = sum(questions_attempted)
-mins              = sum(duration_min)
-revisions_done    = sessions with activity == "Revision"
-
-score  = min(35, active_days * 5)        # consistency
-       + min(20, subjects_touched * 3)    # diversity
-       + min(20, qs // 5)                 # solve volume
-       + min(15, mins // 30)              # hours
-       + min(10, revisions_done * 2)      # revision habit
-score  = min(100, score)
-```
-
-### 8.4 Weakness Engine
-`pulse` endpoint, last-30-days window.
-
-- Group attempts by `(subject, topic)`.
-- Require `total >= 3` attempts in that bucket.
-- Mark as weak if `accuracy < 0.7`.
-- Return top 3, sorted ascending by accuracy.
-
-### 8.5 GATE Readiness (composite)
-- **PYQ %** = attempts of questions where `year != null` ÷ total such questions.
-- **Revision readiness** = `min(100, revisionsCompletedLast7d * 10)`.
-- **Mock readiness** = `min(100, avgSubjectCompletion * 0.6 + min(40, mockCount * 5))`.
-
-### 8.6 Due-revisions total (mission counter)
-`due_revisions = due_srs + due_timeline_revisions`
-
-- `due_srs`: count of `srs` docs with `next_review_date <= today`.
-- `due_timeline_revisions`: across all timeline entries, count `(rd <= today AND rd not in completed_revisions)`.
+| Component | Used In | Description |
+|-----------|---------|-------------|
+| `LectureTable` | Pulse, Log | Inline-editable table with 7 columns, collapsible subject groups, sort/filter, sticky header, auto-save |
+| `StudyTimer` | Pulse | Stopwatch/countdown with focus modal, auto-log on countdown complete, manual save button |
+| `MissionCard` | Pulse | Top 4 prioritized daily actions |
+| `MarkdownRenderer` | Practice, Details | ReactMarkdown with LaTeX via rehype-katex |
+| `QuestionFormModal` | Repository | Create/edit question form |
+| `QuestionDetailsModal` | Repository | Full question view with attempts history |
+| `TimelineEntryModal` | Timeline | Create/edit timeline entry |
+| `RevisitMenu` | Repository, Practice, etc. | Quick revisit scheduling |
+| `HelpButton` | All pages | ? icon → modal with contextual quick guide |
+| `CommandPalette` | Layout | Cmd/Ctrl-K global command search |
+| `Layout` | All pages | Sidebar nav + responsive hamburger drawer |
 
 ---
 
-## 9. Coding conventions
+## 9. Design System
 
-- **Backend**
-  - Single-file `server.py`. All routes prefixed with `/api`. Mount via `app.include_router(api_router)`.
-  - Always store dates as `"YYYY-MM-DD"` strings; timestamps as ISO strings with `datetime.now(timezone.utc).isoformat()`.
-  - Use `{"_id": 0}` projection on every find; never return raw `_id`.
-  - Pydantic v2 (`model_dump()`, `model_fields`).
-  - `Dict[str, Any]` payloads for flexible write endpoints; strict models for response shapes.
-  - Mongo client = singleton `AsyncIOMotorClient`. Close on shutdown.
-
-- **Frontend**
-  - Functional components with hooks only. Keep components < ~200 lines.
-  - Tailwind utility classes; design tokens via `hsl(var(--token))` (theme in `index.css`).
-  - Reusable primitives: `Modal`, `Latex`, `RevisitMenu`, `HelpButton`.
-  - Every interactive/critical element gets a `data-testid` (kebab-case, descriptive).
-  - API access only through `src/lib/api.js` (axios instance with `REACT_APP_BACKEND_URL`). Never hardcode URLs.
-  - Optimistic UI for bookmark/toggle; fall back to reload on failure.
-  - URL-state (subject, filter, mode) reflected via `useSearchParams` where it makes sense; persisted via `localStorage` for power-user preferences.
-
-- **Testing**
-  - Pytest for backend (`backend/tests/`), Playwright via the platform's test agent for end-to-end.
-  - Iteration reports live in `/app/test_reports/iteration_N.json`.
-
----
-
-## 10. Design principles
-
-- **Monochrome surface, single accent.** Background neutrals + one accent (HSL token `--accent`). Status colors: success (green), warning (amber), danger (red), info (blue).
-- **2px borders** as the primary structural device (cards, dividers). Avoids the soft-shadow "AI slop" look.
-- **Typography**: UI sans + a monospace (`mono` class) for numbers and IDs. Numbers are always tabular.
-- **Information density** comes first on Repository/Log; whitespace dominates on Pulse/Practice.
-- **Motion**: 150ms transitions on color/background only; `active:scale-[0.97]` micro-feedback on buttons. Modals slide up on mobile.
-- **Accessibility**: focus outlines preserved (`:focus-visible` 2px accent), all icons paired with text or `aria-label`, color is never the only signal (icons accompany state).
-
----
-
-## 11. Current version
-
-- Tag: **v1.0** (frozen). Header displays "v1.1" (build tag — leave as-is unless re-released).
-- Backend `/api/` returns `{"app": "BYOPGateCS.studio", "status": "ok"}`.
-- Render-only deployment: FastAPI serves the React build via `StaticFiles` with SPA fallback. `render.yaml` included with full build pipeline.
-
-### v1.0 — frozen state (open-source baseline)
-- Question Details Modal (LaTeX, attempts, mastery, revision status, GateOverflow).
-- Repository column sorting + remembered filters/sort.
-- Double-click row → Details Modal.
-- Log stopwatch (Space/R/N shortcuts) + journal field + session summary.
-- Jan-1 countdown widget in header.
-- Timeline-scheduled revisions correctly counted in Pulse + Mission.
-- Contextual `?` help on Repository, Practice, Pulse, Log, Timeline.
-- Full mobile responsiveness (hamburger, bottom-sheet modals, no horizontal overflow).
-- Final cleanup pass: zero lint warnings, dead files removed, `.env.example` for both services, comprehensive `.gitignore`, full `README.md`, `HOW_TO_CODE_THIS_PROJECT.txt`.
-
----
-
-## 12. Pending improvements (P0 → P3)
-
-### P0 — production hardening
-- ~~Replace N+1 patterns in `list_questions`~~ ✅ Done (v1.0). Uses `$in` batch fetches and aggregation pipeline for attempts.
-- Server-side pagination on Repository (currently `limit=1000`).
-
-### P1 — UX polish
-- Full keyboard navigation in Repository (arrows + Enter to open details).
-- Practice "session navigator": queue of upcoming questions with back/forward.
-- Confidence-vs-correct reflection card after each Practice session.
-- Weekly summary card in Log (Sun: this-week vs last-week diff).
-- Per-mission `data-testid="mission-item-<id>"` on Pulse.
-
-### P2 — Features
-- Pomodoro mode in Log stopwatch (25/5).
-- Mock test runner with timer + per-question split.
-- Subject-completion drill-down on Pulse.
-- Shareable Pulse snapshot (one-tap PNG export of today's stats).
-
-### P3 — Infra
-- Move auto-seed behind first-run check.
-- Optional auth (single-user → multi-device sync via JWT).
-- Background job for daily digest email (SendGrid).
-
----
-
-## 13. Deployment notes
-
-### Render (single service)
-```
-render.yaml at repo root defines the full pipeline:
-  buildCommand: pip install -r backend/requirements.txt && cd frontend && yarn install --frozen-lockfile && yarn build
-  startCommand: cd backend && uvicorn server:app --host 0.0.0.0 --port $PORT
+### Dark theme (default)
+```css
+--bg: 0 0% 7%
+--bg-elev: 0 0% 9%
+--bg-elev-2: 0 0% 11%
+--accent: 24 95% 58%    /* warm orange */
 ```
 
-FastAPI serves:
-- `/api/*` — all backend routes
-- `/static/*` — CRA's JS/CSS/media
-- Everything else — `index.html` (React SPA fallback for React Router)
+### Light theme
+```css
+--bg: 30 15% 96%         /* warm cream */
+--bg-elev: 30 20% 99%
+--bg-elev-2: 28 15% 93%
+--accent: 24 95% 54%     /* slightly darker orange */
+```
 
-Env vars on Render: `MONGO_URL`, `DB_NAME`, `CORS_ORIGINS` (set to the Render URL).
+### Card variants
+- `card-2` — 2px border + box-shadow depth + hover accent ring
+- `card-2-accent` — card-2 with orange left border
+- `card-2-pulse` — card-2 with green left border
+- `card-2-time` — card-2 with info left border
 
-### Healthcheck
-- `GET /api/` returns 200 `{"app":"BYOPGateCS.studio","status":"ok"}`.
+### Section separation
+All pages use `space-y-6` (24px) between sections with headers inside `card-2` containers. Pulse adds labeled section dividers with horizontal rules.
 
-### `.env.example` files
-Committed in both `backend/` and `frontend/` with full inline documentation.
+### Spacing
+- `space-y-6` (24px) — between major sections
+- `space-y-4` (16px) — within section groups
+- `p-5` (20px) — standard card padding
 
-*Last updated: 2026-06-29 (v1.0 — Render single-service deployment, N+1 fix, CORS fix).*
+---
+
+## 10. Key Design Decisions
+
+- **No auth** — single-user app eliminates entire auth complexity
+- **Optimistic UI** — bookmarks, deletes, edits reflect instantly; server is fallback
+- **SPA served by FastAPI** — single Render service, no CORS issues in production
+- **StudyTimer auto-logging** — countdown completion automatically creates a study_log entry; manual Save button on the inline bar
+- **Practice auto-logs batch** — one log per subject per day, not one per question
+- **Timeline logs** — creating a timeline entry auto-creates a linked study_log (unless `skip_log: true`)
+- **Revision logs** — completing a timeline revision creates a "Revision" study_log
+- **Calendar is read-side aggregate** — no materialized view; sums study_logs on read
+- **Exam date auto-advance** — if persisted date is in the past, `_get_settings()` resets to default
+- **Seed covers all 12 subjects** — one question per GATE subject
+
+---
+
+## 11. Environment Variables
+
+| Variable | Required | Default |
+|----------|----------|---------|
+| `MONGO_URL` | For Atlas | Falls back to `mongomock_motor` (in-memory) |
+| `DB_NAME` | No | `byopstudio` |
+| `CORS_ORIGINS` | No (production same-origin) | `*` |
+| `REACT_APP_BACKEND_URL` | No (production same-origin) | `""` |
+
+---
+
+## 12. Deployment Flow
+
+1. Push to GitHub
+2. Set up MongoDB Atlas M0 cluster + database user + `0.0.0.0/0` network access
+3. Render auto-detects `render.yaml` → single web service
+4. Set `MONGO_URL` and `DB_NAME` env vars in Render
+5. After deploy: `curl -X POST https://your-app.onrender.com/api/seed-demo`
+6. Verify all pages: `/pulse`, `/solve/repository`, `/solve/practice`, `/log`, `/timeline`
+
+---
+
+*Last updated: 2026-06-30 · v1.0*

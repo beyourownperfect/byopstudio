@@ -117,16 +117,34 @@ export const HELP_CONTENT = {
   lectures: {
     title: "Lecture Progress",
     sections: [
-      { title: "Fast logging", body: "Add a lecture in under 10 seconds — subject, topic, name, number (e.g. 12/42), duration, and completion %. Toggle Notes ✓ and Revision ✓ inline." },
-      { title: "Tracking", body: "Lectures are grouped Subject → Topic. Each level shows progress bars so you can see exactly how much ground you've covered." },
+      { title: "Fast logging", body: "Add a lecture in under 10 seconds — subject, topic, name, number, and completion %. Toggle Notes ✓ and Revision ✓ inline with a single click." },
+      { title: "Tracking", body: "Lectures grouped by Subject. Collapse/expand groups. Sort by Subject, Topic, or Lecture #. Hover rows for subtle highlight — click any cell to edit inline." },
     ],
   },
 
   "subject-completion": {
     title: "Subject Completion",
     sections: [
-      { title: "Checklist", body: "Configurable per-subject checklist: Lectures, Notes, Flashcards, PYQs, Revision, Subject Test (core), plus DPP & Weekly Quiz (optional). Final milestone: can you explain the complete topic without notes?" },
-      { title: "Independent from Pulse", body: "This checklist is entirely manual and self-contained. It will integrate with Pulse in a future update." },
+      { title: "Checklist", body: "Configurable per-subject checklist: Lectures, Notes, Flashcards, PYQs, Revision, Subject Test, plus DPP & Weekly Quiz. Final milestone: explain the complete topic without notes." },
+      { title: "Tracking", body: "View on Pulse under Readiness. Sorted by completion % — focus on the lowest first. Check and uncheck items to see progress move in real-time." },
+    ],
+  },
+
+  bookmarks: {
+    title: "Bookmarks",
+    sections: [
+      { title: "Purpose", body: "Questions you've starred from Repository or Practice. A lightweight curation list for high-signal PYQs worth revisiting." },
+      { title: "Best workflow", body: "Star any question during Practice if you guessed or felt fragile. Review bookmarks weekly — unstar once the question feels automatic." },
+      { title: "Tips", body: "Each entry shows subject badge, mastery score, statement preview, next review date, and quick actions for practice or revisit scheduling." },
+    ],
+  },
+
+  mistakes: {
+    title: "Mistakes Bank",
+    sections: [
+      { title: "Purpose", body: "Every question you answered incorrectly, organized by recency and frequency. Your personal error journal." },
+      { title: "Modes", body: "All wrong — complete history. Wrong today — today's mistakes. Frequently wrong — 2+ incorrect attempts. Forgotten — due for revision but not attempted. Bookmarked mistakes — starred + wrong." },
+      { title: "Best workflow", body: "Review wrong-today questions at end of day. Hit 'Practice Mistakes' to drill the full list. Unstar items you've mastered; revisit the rest." },
     ],
   },
 };

@@ -34,7 +34,7 @@ export default function Bookmarks() {
       <div className="card-2 px-5 py-4">
         <h1 className="text-xl font-semibold flex items-center gap-2">
           <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" /> Bookmarks
-          <HelpButton moduleKey="bookmarks" title="Bookmarks" sections={HELP_CONTENT.bookmarks?.sections || [{ title: "Starred", body: "Questions you've bookmarked from Repository or Practice appear here." }]} />
+          <HelpButton moduleKey="bookmarks" title="Bookmarks" sections={HELP_CONTENT.bookmarks.sections} />
         </h1>
         <p className="text-xs text-[hsl(var(--fg-muted))]">Important questions you starred · {items.length} items</p>
       </div>

@@ -40,7 +40,7 @@ export default function Mistakes() {
       <div className="card-2 px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold flex items-center gap-2"><AlertCircle className="w-5 h-5 text-[hsl(var(--danger))]" /> Mistakes Bank
-            <HelpButton moduleKey="mistakes" title="Mistakes" sections={HELP_CONTENT.mistakes?.sections || [{ title: "Wrong answers", body: "Every question you answered incorrectly, organized by recency and frequency." }]} />
+            <HelpButton moduleKey="mistakes" title="Mistakes" sections={HELP_CONTENT.mistakes.sections} />
           </h1>
           <p className="text-xs text-[hsl(var(--fg-muted))]">Where you slipped · {items.length} questions</p>
         </div>

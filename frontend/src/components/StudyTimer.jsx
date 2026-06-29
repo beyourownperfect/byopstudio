@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, RotateCcw, Maximize2, X } from "lucide-react";
+import { Play, Pause, RotateCcw, Maximize2, X, Save } from "lucide-react";
+import { logsApi } from "@/lib/api";
+import { todayISO } from "@/lib/dateUtils";
 
 const STOPWATCH_COLOR = "hsl(170 70% 45%)";
 const STOPWATCH_RUN_COLOR = "hsl(170 85% 55%)";
@@ -24,7 +26,9 @@ export default function StudyTimer() {
   const [countdownMins, setCountdownMins] = useState(25);
   const [countdownSecs, setCountdownSecs] = useState(0);
   const [focusOpen, setFocusOpen] = useState(false);
+  const [savedToast, setSavedToast] = useState(false);
   const intervalRef = useRef(null);
+  const loggedRef = useRef(false);
 
   const start = useCallback(() => {
     if (running) return;
@@ -33,6 +37,7 @@ export default function StudyTimer() {
       if (t <= 0) return;
       setTotalSec(t);
       if (elapsed >= t) setElapsed(0);
+      loggedRef.current = false;
     }
     setRunning(true);
   }, [running, mode, countdownMins, countdownSecs, elapsed]);
@@ -59,11 +64,24 @@ export default function StudyTimer() {
   }, [running]);
 
   useEffect(() => {
-    if (mode === "countdown" && running && elapsed >= totalSec) {
+    if (mode === "countdown" && running && elapsed >= totalSec && !loggedRef.current) {
+      loggedRef.current = true;
       setRunning(false);
+      const minutes = Math.round(totalSec / 60) || 1;
+      logsApi.create({
+        date: todayISO(),
+        activity: "Practice",
+        subject: "OS",
+        topic: "",
+        duration_min: minutes,
+        remarks: `Countdown timer: ${countdownMins}m session`,
+      }).then(() => {
+        setSavedToast(true);
+        setTimeout(() => setSavedToast(false), 3000);
+      }).catch(() => {});
       new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gICAf39/gICAf3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f4B/f3+AgICAf3+AgH9/f3+AgICAf3+AgICAf3+AgICAf39/gICAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gID//w==").play().catch(() => {});
     }
-  }, [elapsed, running, mode, totalSec]);
+  }, [elapsed, running, mode, totalSec, countdownMins]);
 
   const switchMode = (m) => {
     setRunning(false);
@@ -72,6 +90,26 @@ export default function StudyTimer() {
   };
 
   const closeFocus = useCallback(() => setFocusOpen(false), []);
+
+  const saveToLog = async () => {
+    const minutes = Math.round(
+      (mode === "stopwatch" ? elapsed : totalSec) / 60
+    ) || 1;
+    await logsApi.create({
+      date: todayISO(),
+      activity: "Practice",
+      subject: "OS",
+      topic: "",
+      duration_min: minutes,
+      remarks:
+        mode === "stopwatch"
+          ? `Stopwatch: ${formatTime(elapsed)}`
+          : `Countdown timer: ${countdownMins}m session`,
+    });
+    setSavedToast(true);
+    setTimeout(() => setSavedToast(false), 3000);
+    reset();
+  };
 
   useEffect(() => {
     if (!focusOpen) return;
@@ -87,7 +125,7 @@ export default function StudyTimer() {
     : (running ? COUNTDOWN_RUN_COLOR : COUNTDOWN_COLOR);
 
   return (
-    <div>
+    <div className="relative">
       {/* ── Inline compact timer bar ── */}
       <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-[hsl(var(--bg-elev))] px-3 py-1.5">
         {/* Mode tabs */}
@@ -149,9 +187,19 @@ export default function StudyTimer() {
         </button>
 
         <span className="w-px h-5 bg-border mx-0.5" />
+        <button onClick={saveToLog} className="btn-ghost p-1" title="Save to log" disabled={display <= 0}>
+          <Save className="w-3.5 h-3.5" />
+        </button>
         <button onClick={() => setFocusOpen(true)} className="btn-ghost p-1" title="Focus mode">
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
+
+        {/* Saved toast */}
+        {savedToast && (
+          <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-[hsl(var(--success))] whitespace-nowrap animate-modal-in">
+            ✓ Saved to log
+          </span>
+        )}
       </div>
 
       {/* ── Focus Mode Modal ── */}

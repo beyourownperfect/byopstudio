@@ -2,13 +2,13 @@
 
 A single-user study operating system for GATE Computer Science prep. Capture questions, solve under spaced repetition, schedule revisions, and measure momentum — all without a planner.
 
-> **Version:** v1.0 · MIT-style permissive (see LICENSE if added) · Open source.
+> **Version:** v1.0 · MIT-style permissive · Open source.
 
 ---
 
 ## Overview
 
-GATE CSE rewards depth, not breadth. BYOPGateCS.studio (Be Your Own Perfect — GATE CS) replaces a study planner with a closed-loop habit engine:
+GATE CSE rewards depth, not breadth. BYOPGateCS.studio replaces a study planner with a closed-loop habit engine:
 
 1. **Capture** — every PYQ / practice question lives in one Repository with LaTeX, options, explanation, GateOverflow link.
 2. **Solve** — the Practice screen serves the right question (due / weak / new / wrong / bookmarked) and records confidence + time.
@@ -21,34 +21,38 @@ Single user, no auth, no cloud lock-in. One-click deploy to Render, backed by Mo
 
 ## Features
 
-- **Repository** — CRUD on questions with LaTeX (KaTeX). Filter (Due / Wrong / Weak / Bookmarked / Never attempted / Mastered), search, column sort, multi-select bulk delete with undo, CSV import / export, remembered filters via localStorage.
-- **Question Details modal** — open by double-clicking any row. Rendered LaTeX, attempts history, mastery bar (0-100), next-review date, GateOverflow link.
-- **Practice** — SRS-driven sessions (MCQ / MSQ / NAT). Stopwatch, confidence 1-5, explanation, bookmark, schedule-revisit.
-- **Pulse dashboard** — Today's Mission (top 4 prioritized actions), Momentum (0-100), Due Today, daily progress vs targets, Weak Topics, Subject Completion, GATE Readiness (PYQ / Revision / Mock), countdown.
-- **Log** — large live stopwatch (Space = start/pause, R = reset, N = new log), Subject / Activity / Topic + Journal note, session summary (Total time, Sessions, Questions, Accuracy), daily/weekly/monthly views.
-- **Timeline** — daily / weekly / monthly calendar of all study activity + scheduled revisions (+1d / +3d / +7d / +14d / +30d or custom date).
-- **Cmd/Ctrl-K** command palette, **Jan-1 countdown** widget, **? help popups** on every module, mobile-responsive throughout (hamburger drawer, bottom-sheet modals).
+- **Pulse dashboard** — Today's Mission (top 4 prioritized actions), Momentum (0-100 with sparkline), Due Today (SRS + revisits), daily progress vs targets, Weak Topics, Subject Completion, GATE readiness, countdown to exam. Warm accent theme with card depth shadows and section dividers.
+- **Study Timer** — Stopwatch (teal) and Countdown (warm orange) modes in the Pulse header. Focus Mode modal with large display and presets (5m, 15m, 25m, 45m, 60m). Auto-saves completed countdown sessions to study logs. Manual Save button on inline bar.
+- **Repository** — inline grid table with 8 columns (checkbox, subject, type, statement, mastery bar, next revision, revisit, actions). Filter by subject/mode, search, sort by column headers, multi-select bulk delete with undo, CSV import/export, OCR prompt modal, remembered filters via localStorage. Double-click rows for full details modal with LaTeX, attempts history, and mastery.
+- **Practice** — SRS-driven sessions (MCQ / MSQ / NAT). Setup screen → active solving with confidence 1-5, per-question stopwatch, feedback with explanation, bookmark, revisit scheduling, queue navigation.
+- **Bookmarks** — starred questions with subject badges, mastery scores, quick practice/revisit actions.
+- **Mistakes Bank** — wrong answers by 5 modes: All wrong, Wrong today, Frequently wrong (2+), Forgotten, Bookmarked mistakes. Practice-all button.
+- **Log** — live stopwatch (Space = start/pause, R = reset, N = new log) with subject/activity/topic/journal. Session summary cards. Daily/weekly/monthly collapsible views. **LectureTable** (inline-editable with sort/filter/grouping) and **Subject Completion** checklist below.
+- **Timeline** — daily/weekly/monthly calendar of entries, scheduled revisions (+1d/+3d/+7d/+14d/+30d presets), and revisits.
+- **Lecture Progress** — compact inline-editable table on Pulse and Log. 7 columns: Subject, Topic, Lect #, Lecture Name, Completion %, Notes ✓, Revision ✓. Click-to-edit cells, instant checkbox toggles, sort/filter, collapsible subject groups, sticky header, auto-save.
+- **Quick guides** — ? help button on every page with concise contextual documentation.
+- **Cmd/Ctrl-K** command palette, mobile-responsive (hamburger drawer).
 
 ---
 
-## Tech stack
+## Tech Stack
 
 | Layer | Tech |
-| ----- | ---- |
-| Frontend | React 19 (CRA + craco), TailwindCSS, Radix UI primitives, lucide-react, react-katex, react-router-dom |
-| Backend | FastAPI (Python 3.11+), Motor (async MongoDB driver), Pydantic v2, Uvicorn |
-| Database | MongoDB (Atlas or local) |
+|-------|------|
+| Frontend | React 19 (CRA + craco), TailwindCSS, Radix UI primitives, lucide-react, KaTeX, react-router-dom v7 |
+| Backend | FastAPI, Motor (async MongoDB), Pydantic v2, Uvicorn |
+| Database | MongoDB (Atlas or local, falls back to in-memory mongomock) |
 | Build | Yarn (frontend), pip (backend) |
-| Deployment | Render (single web service — frontend + backend on one URL) + MongoDB Atlas |
+| Deployment | Render (single web service) + MongoDB Atlas |
 
 ---
 
-## Local setup
+## Local Setup
 
 ### Prerequisites
 - **Node.js 18+** and **Yarn**
 - **Python 3.11+**
-- **MongoDB 5+** running locally (or a connection string to Atlas)
+- **MongoDB 5+** running locally (or Atlas connection string)
 
 ### Quick start
 
@@ -58,67 +62,61 @@ cd byopgatecs.studio
 
 # Backend
 cd backend
-python -m venv .venv && source .venv/bin/activate   # or: .\.venv\Scripts\activate on Windows
+python -m venv .venv && source .venv/bin/activate   # Windows: .\.venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env      # edit MONGO_URL if needed
 uvicorn server:app --reload --host 0.0.0.0 --port 8000
 
-# Frontend (in another terminal)
+# Frontend (another terminal)
 cd ../frontend
 yarn install
 cp .env.example .env      # set REACT_APP_BACKEND_URL=http://127.0.0.1:8000
 yarn start                # opens http://localhost:3000
 ```
 
-For production-style single-service mode (backend serves the built frontend):
-
+Production-style single-service mode:
 ```bash
 cd frontend && yarn build
 cd ../backend && uvicorn server:app --host 0.0.0.0 --port 8000
-# Open http://localhost:8000 — the FastAPI server serves the React app at / and /api at /api
+# Open http://localhost:8000
 ```
 
 ### Seed demo data
-
-After the backend is up, hit the seed endpoint once:
 
 ```bash
 curl -X POST http://localhost:8000/api/seed-demo
 ```
 
-Inserts 8 sample questions across subjects. Idempotent — no-op if questions already exist.
+Inserts 12 sample questions — one per GATE subject. Idempotent if questions exist.
 
 ---
 
-## Environment variables
+## Environment Variables
 
 ### Backend (`backend/.env`)
 
-| Variable | Required | Description |
-| -------- | -------- | ----------- |
-| `MONGO_URL` | yes | MongoDB connection string. Local: `mongodb://localhost:27017`. Atlas: `mongodb+srv://user:pass@cluster.mongodb.net/`. |
-| `DB_NAME` | yes | Database name (any non-empty identifier, e.g. `byopstudio`). |
-| `CORS_ORIGINS` | no | Comma-separated list of allowed origins. Defaults to `*`. In production, set to your Render URL. |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `MONGO_URL` | For Atlas | Falls back to in-memory | MongoDB connection string |
+| `DB_NAME` | No | `byopstudio` | Database name |
+| `CORS_ORIGINS` | No | `*` | Comma-separated allowed origins |
 
 ### Frontend (`frontend/.env`)
 
-| Variable | Required | Description |
-| -------- | -------- | ----------- |
-| `REACT_APP_BACKEND_URL` | no | Backend API base URL (no trailing slash). Set for local dev with separate frontend/backend (`http://127.0.0.1:8000`). Leave empty for single-service Render deployment — the app uses `/api` on the same origin. |
-
-`.env.example` files are committed in both `backend/` and `frontend/`.
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `REACT_APP_BACKEND_URL` | No | `""` | Backend URL for local dev. Leave empty for same-origin (Render). |
 
 ---
 
-## MongoDB setup
+## Database
 
-### Local
+MongoDB with these collections: `questions`, `attempts`, `srs`, `study_logs`, `timeline`, `revisits`, `lectures`, `settings`, `subject_completion`, `user_missions`. Schema auto-created on first write — no migrations needed. Falls back to in-memory `mongomock_motor` when no `MONGO_URL` is set.
+
+### Local MongoDB
 ```bash
-# macOS (Homebrew)
+# macOS
 brew install mongodb-community && brew services start mongodb-community
-
-# Ubuntu / Debian
-sudo apt install mongodb && sudo systemctl start mongod
 
 # Docker (fastest)
 docker run -d --name byop-mongo -p 27017:27017 mongo:7
@@ -126,102 +124,54 @@ docker run -d --name byop-mongo -p 27017:27017 mongo:7
 
 Set `MONGO_URL=mongodb://localhost:27017` and `DB_NAME=byopstudio`.
 
-### Production — MongoDB Atlas
-1. Create a free M0 cluster at <https://cloud.mongodb.com>.
-2. Database Access → add user with password.
-3. Network Access → add `0.0.0.0/0` (or Render's IP range for stricter security).
-4. Copy the connection string and set `MONGO_URL=mongodb+srv://USER:PASS@cluster.mongodb.net/?retryWrites=true&w=majority`.
-
-Schema is auto-created on first write. No migrations needed.
-
 ---
 
-## Deployment — Render (single service)
+## Deployment — Render
 
-See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for the complete step-by-step guide.
-
-The project deploys as **one Render web service** that serves both the React frontend and the FastAPI backend from a single URL.
+See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for the full step-by-step guide.
 
 **Quick summary:**
-- Commit `frontend/build/` is not required — Render builds it via `yarn build`
-- `render.yaml` is included with the correct build + start commands
-- Set env vars: `MONGO_URL`, `DB_NAME`, `CORS_ORIGINS`
-- That's it — one URL, all CRUD persists in MongoDB Atlas
+1. Push repo to GitHub
+2. Set up MongoDB Atlas M0 cluster + database user + `0.0.0.0/0` network access
+3. Render auto-detects `render.yaml` → single web service
+4. Set `MONGO_URL` and `DB_NAME` env vars
+5. After deploy: `curl -X POST https://your-app.onrender.com/api/seed-demo`
 
 ---
 
-## Folder structure
+## Folder Structure
 
 ```
-.
-├── PROJECT_CONTEXT.md          # Architecture & design context
-├── README.md                   # This file
-├── DEPLOYMENT.md               # Render deployment guide
-├── HOW_TO_CODE_THIS_PROJECT.txt
-├── render.yaml                 # Render Blueprint spec
-├── .gitignore
 ├── backend/
-│   ├── server.py               # All routes, models, helpers, seed + StaticFiles for frontend
+│   ├── server.py               # All routes, models, helpers, seed, SPA serving
 │   ├── requirements.txt
-│   ├── pytest.ini
 │   ├── Procfile
-│   ├── tests/                  # backend pytest suite
-│   ├── .env.example
-│   └── .env                    # gitignored
-└── frontend/
-    ├── package.json, craco.config.js, tailwind.config.js, postcss.config.js
-    ├── .env.example
-    ├── public/
-    └── src/
-        ├── App.js, index.js, index.css, App.css
-        ├── components/         # Layout, Modal, HelpButton, JanCountdown,
-        │   │                   # QuestionFormModal, QuestionDetailsModal,
-        │   │                   # TimelineEntryModal, RevisitMenu, Latex, CommandPalette
-        │   └── ui/             # Radix-based shadcn primitives
-        ├── pages/              # Pulse, Repository, Practice, Bookmarks,
-        │                       # Mistakes, Log, Timeline
-        ├── lib/                # api.js (axios), constants.js, helpContent.js, dateUtils.js
-        └── hooks/              # use-toast.js
+│   └── tests/
+├── frontend/
+│   └── src/
+│       ├── pages/              # Pulse, Repository, Practice, Bookmarks, Mistakes, Log, Timeline
+│       ├── components/         # Layout, LectureTable, StudyTimer, MissionCard, MarkdownRenderer,
+│       │                       # QuestionFormModal, QuestionDetailsModal, TimelineEntryModal,
+│       │                       # RevisitMenu, HelpButton, CommandPalette, Modal
+│       ├── lib/                # api.js, constants.js, dateUtils.js, helpContent.js
+│       └── index.css           # Tailwind + custom properties + component classes
+├── memory/                     # PRD, notes
+├── render.yaml
+├── README.md
+├── DEPLOYMENT.md
+├── PROJECT_CONTEXT.md
+└── PROJECT_GUIDE.md
 ```
 
 ---
 
-## Future roadmap
+## Documentation
 
-### v1.x — polish
-- Repository keyboard navigation (arrows + Enter to open details).
-- Practice session navigator: queue of upcoming questions with back/forward.
-- Confidence-vs-correct reflection card after each session.
-- Weekly summary card in Log (this-week vs last-week diff).
-- Server-side pagination on Repository.
-
-### v2.0 — capabilities
-- Pomodoro mode in Log stopwatch.
-- Mock test runner with per-question split timer.
-- Subject-completion drill-down on Pulse.
-- AI study mentor: explain wrong answers, auto-create a +1d revision.
-- Shareable Pulse snapshot (PNG export).
-
-### v3.0 — platform
-- Optional auth (multi-device sync via JWT).
-- Daily-digest email (SendGrid).
-- iOS / Android wrappers (Capacitor).
+- **`README.md`** — Project overview, setup, features (this file)
+- **`DEPLOYMENT.md`** — Render + MongoDB Atlas deployment guide
+- **`PROJECT_CONTEXT.md`** — Full architecture, schema, API routes, design system, key decisions
+- **`PROJECT_GUIDE.md`** — Build-from-scratch educational guide
 
 ---
 
-## Contributing
-
-1. Open an issue describing the bug or feature.
-2. Branch from `main`. Use small, focused PRs.
-3. Run `yarn build` (frontend) and `pytest` (backend) before pushing.
-4. Keep the single-file `server.py` style and the existing folder layout.
-
-See `PROJECT_CONTEXT.md` for the full architecture, schema, and algorithm spec.
-
----
-
-## Acknowledgements
-
-- The SRS interval scheme is a simplified Leitner / SM-0 system.
-- LaTeX rendering via [KaTeX](https://katex.org/).
-- Inspired by GateOverflow, Anki, and a stubborn refusal to use spreadsheets.
+*Last updated: 2026-06-30 · v1.0*
