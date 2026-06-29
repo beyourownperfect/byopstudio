@@ -15,7 +15,7 @@
     --fg-subtle: 0 0% 42%;
     --border: 0 0% 16%;
     --border-strong: 0 0% 22%;
-    --accent: 217 91% 60%;
+    --accent: 24 95% 58%;
     --accent-fg: 0 0% 100%;
     --success: 142 71% 45%;
     --warning: 38 92% 50%;
@@ -42,15 +42,15 @@
   }
 
   [data-theme="light"] {
-    --bg: 0 0% 98%;
-    --bg-elev: 0 0% 100%;
-    --bg-elev-2: 0 0% 94%;
-    --fg: 0 0% 12%;
-    --fg-muted: 0 0% 38%;
-    --fg-subtle: 0 0% 52%;
-    --border: 0 0% 84%;
-    --border-strong: 0 0% 68%;
-    --accent: 217 91% 48%;
+    --bg: 30 15% 96%;
+    --bg-elev: 30 20% 99%;
+    --bg-elev-2: 28 15% 93%;
+    --fg: 20 10% 12%;
+    --fg-muted: 20 8% 36%;
+    --fg-subtle: 20 6% 50%;
+    --border: 25 10% 82%;
+    --border-strong: 25 10% 66%;
+    --accent: 24 95% 54%;
     --accent-fg: 0 0% 100%;
     --success: 142 60% 38%;
     --warning: 38 85% 45%;
@@ -116,7 +116,7 @@
     transition: border-color 150ms, box-shadow 150ms;
   }
   .card-2:hover {
-    box-shadow: 0 0 12px -4px hsl(var(--accent) / 0.08);
+    box-shadow: 0 0 6px -3px hsl(var(--accent) / 0.05);
   }
   .card-1 {
     @apply bg-[hsl(var(--bg-elev))] rounded-lg border border-[hsl(var(--border))];
@@ -138,11 +138,11 @@
     @apply inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md
            border border-[hsl(var(--border))] bg-[hsl(var(--bg-elev))]
            hover:bg-[hsl(var(--bg-elev-2))] hover:border-[hsl(var(--accent))]/30
-           hover:shadow-[0_0_10px_-3px_hsl(var(--accent)/0.06)]
+           hover:shadow-[0_0_6px_-2px_hsl(var(--accent)/0.04)]
            active:scale-[0.97] transition-all duration-150
            focus-visible:outline-2 focus-visible:outline-[hsl(var(--accent))] focus-visible:outline-offset-1;
   }
-  .btn-primary { @apply bg-[hsl(var(--accent))] text-white border-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/90 hover:shadow-[0_0_12px_-3px_hsl(var(--accent)/0.25)]; }
+  .btn-primary { @apply bg-[hsl(var(--accent))] text-white border-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/90 hover:brightness-110; }
   .btn-ghost { @apply bg-transparent border-transparent hover:bg-[hsl(var(--bg-elev-2))] hover:shadow-none hover:border-transparent; }
   .btn-danger { @apply bg-transparent text-[hsl(var(--danger))] border-[hsl(var(--danger))]/40 hover:bg-[hsl(var(--danger))]/10 hover:text-[hsl(var(--danger))]; }
   .btn:disabled { @apply opacity-40 pointer-events-none; }

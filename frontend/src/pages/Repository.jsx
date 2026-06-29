@@ -380,16 +380,9 @@ function RepoRow({ q, selected, search, onToggle, onBookmark, onEdit, onDelete, 
       {/* Type */}
       <span className="text-[10px] text-[hsl(var(--fg-muted))] mono font-medium">{q.question_type}</span>
 
-      {/* Statement + metadata chips */}
-      <div className="min-w-0">
-        <div className="truncate" title={q.statement}>
-          <HighlightedStatement statement={q.statement} search={search} />
-        </div>
-        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-          <span className="text-[9px] tracking-wider uppercase text-[hsl(var(--fg-subtle))] mono">{q.question_type}</span>
-          {q.topic && <span className="text-[9px] tracking-wider uppercase text-[hsl(var(--fg-subtle))] ml-0.5">· {q.topic}</span>}
-          {q.exam_source && <span className="text-[9px] tracking-wider uppercase text-[hsl(var(--fg-subtle))] ml-0.5">· {q.exam_source}{q.year ? ` ${q.year}` : ""}</span>}
-        </div>
+      {/* Statement */}
+      <div className="min-w-0 truncate" title={[q.statement, q.topic, q.exam_source && `${q.exam_source}${q.year ? ` ${q.year}` : ""}`].filter(Boolean).join(" · ")}>
+        <HighlightedStatement statement={q.statement} search={search} />
       </div>
 
       {/* Mastery bar + percentage */}
@@ -435,7 +428,7 @@ function EmptyRepo({ onSeed, onNew }) {
       <p className="text-xs text-[hsl(var(--fg-muted))] mb-5">Refine filters or add a question to start.</p>
       <div className="flex items-center justify-center gap-2">
         <button onClick={onNew} className="btn btn-primary"><Plus className="w-3.5 h-3.5" /> New question</button>
-        <button onClick={onSeed} className="btn">Load 8 sample questions</button>
+        <button onClick={onSeed} className="btn">Load 12 sample questions</button>
       </div>
     </div>
   );

@@ -268,7 +268,7 @@ class RevisitItem(BaseModel):
 
 class Settings(BaseModel):
     id: str = "singleton"
-    exam_date: str = "2026-02-07"  # GATE 2026 weekend (default; user editable)
+    exam_date: str = "2027-02-13"  # GATE 2027 weekend (default; user editable)
     daily_question_target: int = 20
     daily_revision_target: int = 10
     daily_study_minutes_target: int = 240

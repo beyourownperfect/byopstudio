@@ -18,4 +18,6 @@
 # design
 - Maintain the minimal neo-brutalist aesthetic — clean spacing, strong borders, dark mode, no excessive ornamentation. Confidence: 0.65
 - Avoid overcrowding the UI; use Tailwind responsive classes properly and include smooth hover states, transitions, and animated switching. Confidence: 0.70
+- Use warm colors for the accent/primary palette instead of blue. Keep gradients minimal and hover effects subtle. Confidence: 0.65
+- Light mode backgrounds should use subtle off-white, cream, or light pink tones rather than pure white. Confidence: 0.70
 
