@@ -1076,19 +1076,10 @@ async def calendar(start: str, end: str):
     return {"days": days}
 
 
-async def _momentum_score() -> int:
-    """Momentum 0-100 over last 7 days. Rewards five things, capped:
-        - daily consistency  (active days * 5,   cap 35)
-        - subject diversity  (subjects * 3,      cap 20)
-        - solve volume       (questions // 5,    cap 20)
-        - hours invested     (minutes // 30,     cap 15)
-        - revision habit     (revisions * 2,     cap 10)
-    Intentional: rewards habit over heroics — one big day cannot maximise the score."""
-    today = date.today()
-    last7 = [(today - timedelta(days=i)).isoformat() for i in range(7)]
-    logs = await db.study_logs.find({"date": {"$in": last7}}, {"_id": 0}).to_list(5000)
+async def _momentum_raw(logs: list) -> dict:
+    """Return momentum score + daily minutes sparkline from pre-fetched logs."""
     if not logs:
-        return 0
+        return {"score": 0, "daily_minutes": [], "active_days": 0}
     active_days = len({log["date"] for log in logs})
     subjects_touched = len({log["subject"] for log in logs})
     qs = sum(log.get("questions_attempted", 0) for log in logs)
@@ -1101,7 +1092,27 @@ async def _momentum_score() -> int:
         + min(15, mins // 30)
         + min(10, revisions_done * 2)
     )
-    return min(100, score)
+    score = min(100, score)
+    # Sparkline: daily minutes per date
+    daily = {}
+    for log in logs:
+        daily[log["date"]] = daily.get(log["date"], 0) + log.get("duration_min", 0)
+    return {"score": score, "daily_minutes": daily, "active_days": active_days}
+
+
+async def _momentum_score() -> int:
+    """Momentum 0-100 over last 7 days. Rewards five things, capped:
+        - daily consistency  (active days * 5,   cap 35)
+        - subject diversity  (subjects * 3,      cap 20)
+        - solve volume       (questions // 5,    cap 20)
+        - hours invested     (minutes // 30,     cap 15)
+        - revision habit     (revisions * 2,     cap 10)
+    Intentional: rewards habit over heroics — one big day cannot maximise the score."""
+    today = date.today()
+    last7 = [(today - timedelta(days=i)).isoformat() for i in range(7)]
+    logs = await db.study_logs.find({"date": {"$in": last7}}, {"_id": 0}).to_list(5000)
+    raw = await _momentum_raw(logs)
+    return raw["score"]
 
 
 @api_router.get("/pulse")
@@ -1191,6 +1202,8 @@ async def pulse():
             {"question_id": {"$in": ids}}, {"_id": 0}
         ).to_list(10000)
         completed = sum(1 for s_rec in srs_records if _is_question_completed(s_rec))
+        mastery_vals_sub = [_compute_mastery(s_rec) for s_rec in srs_records if s_rec.get("total_attempts", 0) > 0]
+        mastery_avg = round(sum(mastery_vals_sub) / len(mastery_vals_sub), 1) if mastery_vals_sub else 0
         overall_total += total
         overall_completed += completed
         subject_completion.append(
@@ -1199,6 +1212,7 @@ async def pulse():
                 "total": total,
                 "completed": completed,
                 "percent": round(completed / total * 100, 1),
+                "mastery_avg": mastery_avg,
             }
         )
     overall_completion_percent = (
@@ -1237,8 +1251,37 @@ async def pulse():
     )
     mock_count = await db.study_logs.count_documents({"activity": "Mock Test"})
     mock_readiness = round(min(100, avg_sub * 0.6 + min(40, mock_count * 5)), 1)
+    mock_tests_exist = mock_count > 0
 
-    momentum = await _momentum_score()
+    # Question Mastery: average _compute_mastery() across all questions with attempts
+    all_srs = await db.srs.find({}, {"_id": 0}).to_list(50000)
+    mastery_vals = [_compute_mastery(s) for s in all_srs if s.get("total_attempts", 0) > 0]
+    question_mastery = round(sum(mastery_vals) / len(mastery_vals), 1) if mastery_vals else 0
+
+    # Momentum: this week + last week + 7-day sparkline
+    today_dt = date.today()
+    this_week_dates = [(today_dt - timedelta(days=i)).isoformat() for i in range(7)]
+    last_week_dates = [(today_dt - timedelta(days=i + 7)).isoformat() for i in range(7)]
+    logs_this = await db.study_logs.find({"date": {"$in": this_week_dates}}, {"_id": 0}).to_list(5000)
+    raw_this = await _momentum_raw(logs_this)
+    logs_last = await db.study_logs.find({"date": {"$in": last_week_dates}}, {"_id": 0}).to_list(5000)
+    raw_last = await _momentum_raw(logs_last)
+    momentum = raw_this["score"]
+    momentum_last_week = raw_last["score"]
+    momentum_delta = momentum - momentum_last_week
+    # Sparkline: minutes per day, ordered oldest→newest (idx 6→0)
+    daily_map = raw_this["daily_minutes"]
+    sparkline = [daily_map.get(d, 0) for d in this_week_dates[::-1]]
+
+    has_study_today = today_qs > 0 or today_minutes > 0
+
+    preparation_snapshot = {
+        "subject_coverage": overall_completion_percent,
+        "question_mastery": question_mastery,
+        "revision_completion": revision_readiness,
+        "mock_readiness": mock_readiness,
+        "mock_tests_exist": mock_tests_exist,
+    }
 
     # Today's Mission (max 4) — prioritized: due revisions, due revisits, weak topics, new practice
     mission = []
@@ -1316,6 +1359,10 @@ async def pulse():
         "mission": mission,
         "user_missions": user_missions,
         "momentum": momentum,
+        "momentum_last_week": momentum_last_week,
+        "momentum_delta": momentum_delta,
+        "momentum_sparkline": sparkline,
+        "preparation_snapshot": preparation_snapshot,
         "due_revisions": due_revisions_total,
         "due_srs": due_srs,
         "due_timeline_revisions": due_timeline_revs,
@@ -1334,6 +1381,7 @@ async def pulse():
         "exam_date": exam_date,
         "today_questions": today_qs,
         "today_minutes": today_minutes,
+        "has_study_today": has_study_today,
         "daily_q_percent": daily_q_pct,
         "daily_m_percent": daily_m_pct,
         "targets": {

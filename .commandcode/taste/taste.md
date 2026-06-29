@@ -14,4 +14,5 @@
 
 # design
 - Maintain the minimal neo-brutalist aesthetic — clean spacing, strong borders, dark mode, no excessive ornamentation. Confidence: 0.65
+- Avoid overcrowding the UI; use Tailwind responsive classes properly and include smooth hover states, transitions, and animated switching. Confidence: 0.70
 

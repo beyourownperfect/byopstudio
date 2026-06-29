@@ -1,14 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, AlertTriangle, BookOpen, Calendar, Settings as SettingsIcon, ChevronDown } from "lucide-react";
+import { Zap, AlertTriangle, BookOpen, Target, RotateCcw, FileText, Settings as SettingsIcon, ChevronDown, ArrowRight, TrendingUp, TrendingDown, CheckCircle, Circle } from "lucide-react";
 import { pulseApi, settingsApi } from "@/lib/api";
-import { SUBJECTS, SUBJECT_LABELS, TID } from "@/lib/constants";
+import { SUBJECT_LABELS, TID } from "@/lib/constants";
 import { fmtDateLong } from "@/lib/dateUtils";
 import HelpButton from "@/components/HelpButton";
 import MissionCard from "@/components/MissionCard";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
-const MOMENTUM_COLORS = (n) => n >= 70 ? "text-[hsl(var(--success))]" : n >= 40 ? "text-[hsl(var(--warning))]" : "text-[hsl(var(--danger))]";
+const MOMENTUM_COLORS = (n) =>
+  n >= 70 ? "text-[hsl(var(--success))]" : n >= 40 ? "text-[hsl(var(--warning))]" : "text-[hsl(var(--danger))]";
+
+const MASTERY_COLOR = (n) =>
+  n >= 80 ? "bg-[hsl(var(--success))]" : n >= 40 ? "bg-[hsl(var(--warning))]" : "bg-[hsl(var(--danger))]";
 
 export default function Pulse() {
   const navigate = useNavigate();
@@ -26,6 +30,11 @@ export default function Pulse() {
     load();
   };
 
+  const sortedSubjects = useMemo(() => {
+    if (!data) return [];
+    return [...data.subject_completion].sort((a, b) => a.percent - b.percent);
+  }, [data]);
+
   if (!data) {
     return (
       <div className="space-y-4">
@@ -37,6 +46,7 @@ export default function Pulse() {
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <div>
@@ -49,39 +59,22 @@ export default function Pulse() {
           <div className="text-right">
             <div className="label-x">GATE in</div>
             <div className="font-semibold mono text-lg">{data.days_until_exam}<span className="text-[hsl(var(--fg-muted))] text-xs ml-1">days</span></div>
+            <StudyStatus hasStudy={data.has_study_today} />
           </div>
-          <button onClick={() => { setExamDate(data.exam_date); setShowSettings(true); }} className="btn-ghost p-2"><SettingsIcon className="w-4 h-4" /></button>
+          <button onClick={() => { setExamDate(data.exam_date); setShowSettings(true); }} className="btn-ghost p-2 hover:bg-[hsl(var(--bg-elev-2))] transition-colors"><SettingsIcon className="w-4 h-4" /></button>
         </div>
       </div>
 
-      {/* Today's Mission (user-defined tasks only) */}
+      {/* Today's Mission */}
       <MissionCard />
 
-      {/* Top row: Momentum, Due, Today's progress */}
+      {/* Preparation Snapshot */}
+      <PreparationSnapshot snapshot={data.preparation_snapshot} />
+
+      {/* Row: Momentum, Due Today, Today's Progress */}
       <div className="grid md:grid-cols-3 gap-4">
-        <div className="card-2 p-5" data-testid={TID.pulseMomentum}>
-          <div className="label-x mb-1">Momentum</div>
-          <div className={`text-4xl font-semibold mono ${MOMENTUM_COLORS(data.momentum)}`}>{data.momentum}</div>
-          <div className="mt-3 w-full bg-[hsl(var(--bg-elev-2))] h-1.5 rounded overflow-hidden">
-            <div className={`h-full ${data.momentum >= 70 ? "bg-[hsl(var(--success))]" : data.momentum >= 40 ? "bg-[hsl(var(--warning))]" : "bg-[hsl(var(--danger))]"}`} style={{ width: `${data.momentum}%` }} />
-          </div>
-          <p className="text-[11px] text-[hsl(var(--fg-muted))] mt-2">7-day rolling: activity, diversity, revision</p>
-        </div>
-
-        <div className="card-2 p-5" data-testid={TID.pulseDueRev}>
-          <div className="label-x mb-1">Due Today</div>
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => navigate("/solve/practice?mode=due")} className="text-left">
-              <div className="text-3xl font-semibold mono">{data.due_revisions}</div>
-              <div className="text-[11px] text-[hsl(var(--fg-muted))]">SRS revisions</div>
-            </button>
-            <button onClick={() => navigate("/solve/repository?filter=revisit_today")} className="text-left">
-              <div className="text-3xl font-semibold mono">{data.due_revisits}</div>
-              <div className="text-[11px] text-[hsl(var(--fg-muted))]">Revisit items</div>
-            </button>
-          </div>
-        </div>
-
+        <MomentumCard momentum={data.momentum} delta={data.momentum_delta} sparkline={data.momentum_sparkline} />
+        <DueTodayCard dueRevisions={data.due_revisions} dueRevisits={data.due_revisits} navigate={navigate} />
         <div className="card-2 p-5">
           <div className="label-x mb-1">Today&apos;s progress</div>
           <div className="space-y-2 mt-1">
@@ -91,93 +84,11 @@ export default function Pulse() {
         </div>
       </div>
 
-      {/* Weak Topics (collapsible) + Readiness */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="card-2 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setWeakExpanded(!weakExpanded)}
-            className="w-full flex items-center justify-between gap-2 px-5 py-4 text-left hover:bg-[hsl(var(--bg-elev))]/60 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-[hsl(var(--warning))]" />
-              <h3 className="font-semibold text-sm">Weak Topics</h3>
-              {data.weak_topics.length > 0 && (
-                <span className="chip chip-danger text-[10px]">{data.weak_topics.length}</span>
-              )}
-            </div>
-            <ChevronDown className={`h-3.5 w-3.5 text-[hsl(var(--fg-muted))] transition-transform ${weakExpanded ? "rotate-180" : ""}`} />
-          </button>
-          {weakExpanded && (
-            <div className="border-t border-border px-5 pb-4 pt-1">
-              {data.weak_topics.length === 0 ? (
-                <p className="text-sm text-[hsl(var(--fg-muted))] py-3">Not enough data yet — solve a few more to surface weak areas.</p>
-              ) : (
-                <div className="space-y-2 mt-2">
-                  {data.weak_topics.map((w, i) => (
-                    <button key={i} onClick={() => navigate(`/solve/practice?mode=weak&subject=${w.subject}`)}
-                      className="w-full text-left px-3 py-2.5 rounded border border-border row-hover">
-                      <div className="flex items-center justify-between text-sm">
-                        <div>
-                          <span className="font-medium">{w.subject}</span>
-                          <span className="text-[hsl(var(--fg-muted))] ml-2">{w.topic}</span>
-                        </div>
-                        <span className="chip chip-danger">{w.accuracy}%</span>
-                      </div>
-                      <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-1">Solve 10 {w.subject} questions →</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+      {/* Weak Topics */}
+      <WeakTopicsCard weakTopics={data.weak_topics} expanded={weakExpanded} toggle={() => setWeakExpanded(!weakExpanded)} navigate={navigate} />
 
-        <div className="card-2 p-5" data-testid={TID.pulseReadiness}>
-          <div className="flex items-center gap-2 mb-3">
-            <Calendar className="w-4 h-4 text-[hsl(var(--accent))]" />
-            <h3 className="font-semibold">GATE Readiness</h3>
-          </div>
-          <ReadinessRow label="PYQ Completion" value={data.pyq_percent} sub={`${data.pyq_done}/${data.pyq_total}`} />
-          <ReadinessRow label="Revision Readiness" value={data.revision_readiness} />
-          <ReadinessRow label="Mock Readiness" value={data.mock_readiness} />
-        </div>
-      </div>
-
-      {/* Subject completion */}
-      <div className="card-2 p-5" data-testid={TID.pulseSubjectCompletion}>
-        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-[hsl(var(--info))]" />
-            <h3 className="font-semibold">Subject Completion</h3>
-            <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--fg-subtle))] ml-1">
-              1 solve + 2 SRS revisions = complete
-            </span>
-          </div>
-          <div className="text-right" data-testid="pulse-overall-completion">
-            <span className="text-xs text-[hsl(var(--fg-muted))]">Overall</span>
-            <span className="ml-2 mono font-semibold text-sm">
-              {data.overall_completion_percent ?? 0}%
-            </span>
-            <span className="ml-1 text-[10px] text-[hsl(var(--fg-subtle))]">
-              ({data.overall_completed ?? 0}/{data.overall_total ?? 0})
-            </span>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-          {data.subject_completion.map((s) => (
-            <div key={s.subject} className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <span className="w-10 mono text-xs shrink-0">{s.subject}</span>
-              <span className="text-xs text-[hsl(var(--fg-muted))] flex-1 truncate min-w-0">{SUBJECT_LABELS[s.subject]}</span>
-              <span className="text-xs mono text-[hsl(var(--fg-muted))] w-12 sm:w-14 text-right shrink-0">{s.completed}/{s.total}</span>
-              <div className="w-16 sm:w-24 h-1.5 bg-[hsl(var(--bg-elev-2))] rounded overflow-hidden shrink-0">
-                <div className="h-full bg-[hsl(var(--accent))]" style={{ width: `${s.percent}%` }} />
-              </div>
-              <span className="mono text-xs w-9 text-right shrink-0">{s.percent}%</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Subject Completion */}
+      <SubjectCompletionCard subjects={sortedSubjects} />
 
       {/* Settings modal */}
       {showSettings && (
@@ -200,6 +111,203 @@ export default function Pulse() {
   );
 }
 
+/* ── Sub-components ── */
+
+function StudyStatus({ hasStudy }) {
+  return (
+    <div className="flex items-center justify-end gap-1 mt-0.5">
+      {hasStudy ? (
+        <>
+          <CheckCircle className="w-3 h-3 text-[hsl(var(--success))]" />
+          <span className="text-[10px] text-[hsl(var(--success))]">Active today</span>
+        </>
+      ) : (
+        <>
+          <Circle className="w-3 h-3 text-[hsl(var(--fg-subtle))]" />
+          <span className="text-[10px] text-[hsl(var(--fg-subtle))]">No activity logged today</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PreparationSnapshot({ snapshot }) {
+  if (!snapshot) return null;
+  const metrics = [
+    { key: "subject_coverage", label: "Subject Coverage", value: snapshot.subject_coverage, icon: BookOpen, help: "% of questions with 1 correct solve + 2 SRS revisions" },
+    { key: "question_mastery", label: "Question Mastery", value: snapshot.question_mastery, icon: Target, help: "Average mastery across all attempted questions" },
+    { key: "revision_completion", label: "Revision Completion", value: snapshot.revision_completion, icon: RotateCcw, help: "Revision sessions completed in last 7 days" },
+    { key: "mock_readiness", label: "Mock Readiness", value: snapshot.mock_tests_exist ? snapshot.mock_readiness : 0, icon: FileText, help: "Log a Mock Test session to unlock", muted: !snapshot.mock_tests_exist },
+  ];
+  return (
+    <div className="card-2 p-5" data-testid={TID.pulseReadiness}>
+      <div className="flex items-center gap-2 mb-4">
+        <Zap className="w-4 h-4 text-[hsl(var(--accent))]" />
+        <h3 className="font-semibold text-sm">Preparation Snapshot</h3>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4">
+        {metrics.map((m) => {
+          const Icon = m.icon;
+          return (
+            <div key={m.key} className={m.muted ? "opacity-50" : ""} title={m.help}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-[hsl(var(--fg-muted))] flex items-center gap-1.5">
+                  <Icon className="w-3.5 h-3.5 text-[hsl(var(--fg-subtle))]" />{m.label}
+                </span>
+                <span className="mono font-semibold text-sm">{m.value}%</span>
+              </div>
+              <div className="w-full h-1.5 bg-[hsl(var(--bg-elev-2))] rounded overflow-hidden">
+                <div className={`h-full transition-all duration-300 ${m.muted ? "bg-[hsl(var(--bg-elev-2))]" : "bg-[hsl(var(--accent))]"}`} style={{ width: `${m.value}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MomentumCard({ momentum, delta, sparkline }) {
+  const maxSpark = Math.max(1, ...(sparkline || []));
+  return (
+    <div className="card-2 p-5" data-testid={TID.pulseMomentum}>
+      <div className="label-x mb-1">Momentum</div>
+      <div className="flex items-end gap-2">
+        <div className={`text-4xl font-semibold mono ${MOMENTUM_COLORS(momentum)}`}>{momentum}</div>
+        {delta !== 0 && (
+          <div className={`flex items-center gap-0.5 text-xs font-medium pb-1 ${delta > 0 ? "text-[hsl(var(--success))]" : "text-[hsl(var(--danger))]"}`}>
+            {delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            <span className="mono">{delta > 0 ? "+" : ""}{delta}</span>
+          </div>
+        )}
+      </div>
+      {sparkline && sparkline.length > 0 && (
+        <div className="flex items-end gap-[3px] h-7 mt-2">
+          {sparkline.map((mins, i) => (
+            <div
+              key={i}
+              className="flex-1 rounded-sm bg-[hsl(var(--accent))]/60 hover:bg-[hsl(var(--accent))] transition-colors"
+              style={{ height: `${Math.max(4, (mins / maxSpark) * 100)}%` }}
+              title={`${mins} min`}
+            />
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-[hsl(var(--fg-subtle))] mt-1.5">7-day consistency score</p>
+    </div>
+  );
+}
+
+function DueTodayCard({ dueRevisions, dueRevisits, navigate }) {
+  return (
+    <div className="card-2 p-5 bg-[hsl(var(--accent))]/[0.04] border-[hsl(var(--accent))]/20" data-testid={TID.pulseDueRev}>
+      <div className="label-x mb-1">Due Today</div>
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          onClick={() => navigate("/solve/practice?mode=due")}
+          className="group text-left p-2 -m-2 rounded hover:bg-[hsl(var(--accent))]/[0.08] transition-colors"
+        >
+          <div className="flex items-center gap-1">
+            <span className="text-3xl font-semibold mono">{dueRevisions}</span>
+            <ArrowRight className="w-3.5 h-3.5 text-[hsl(var(--accent))] opacity-0 group-hover:opacity-100 transition-opacity translate-x-0 group-hover:translate-x-0.5 transition-transform" />
+          </div>
+          <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-0.5">SRS revisions</div>
+        </button>
+        <button
+          onClick={() => navigate("/solve/repository?filter=revisit_today")}
+          className="group text-left p-2 -m-2 rounded hover:bg-[hsl(var(--accent))]/[0.08] transition-colors"
+        >
+          <div className="flex items-center gap-1">
+            <span className="text-3xl font-semibold mono">{dueRevisits}</span>
+            <ArrowRight className="w-3.5 h-3.5 text-[hsl(var(--accent))] opacity-0 group-hover:opacity-100 transition-opacity translate-x-0 group-hover:translate-x-0.5 transition-transform" />
+          </div>
+          <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-0.5">Revisit items</div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WeakTopicsCard({ weakTopics, expanded, toggle, navigate }) {
+  const top = weakTopics?.[0];
+  return (
+    <div className="card-2 overflow-hidden">
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full flex items-center justify-between gap-2 px-5 py-4 text-left hover:bg-[hsl(var(--bg-elev))]/60 transition-colors"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <AlertTriangle className="w-4 h-4 text-[hsl(var(--warning))] shrink-0" />
+          <h3 className="font-semibold text-sm">Weak Topics</h3>
+          {top && (
+            <span className="text-[11px] text-[hsl(var(--fg-muted))] truncate hidden sm:inline">
+              &mdash; {top.subject} {top.topic}: {top.accuracy}%
+            </span>
+          )}
+          {weakTopics.length > 0 && (
+            <span className="chip chip-danger text-[10px] shrink-0">{weakTopics.length}</span>
+          )}
+        </div>
+        <ChevronDown className={`h-3.5 w-3.5 text-[hsl(var(--fg-muted))] transition-transform duration-150 shrink-0 ${expanded ? "rotate-180" : ""}`} />
+      </button>
+      {expanded && (
+        <div className="border-t border-border px-5 pb-4 pt-1">
+          {weakTopics.length === 0 ? (
+            <p className="text-sm text-[hsl(var(--fg-muted))] py-3">Not enough data yet — solve a few more to surface weak areas.</p>
+          ) : (
+            <div className="space-y-2 mt-2">
+              {weakTopics.map((w, i) => (
+                <button
+                  key={i}
+                  onClick={() => navigate(`/solve/practice?mode=weak&subject=${w.subject}`)}
+                  className="w-full text-left px-3 py-2.5 rounded border border-border hover:bg-[hsl(var(--bg-elev))] transition-colors group"
+                >
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium">{w.subject}</span>
+                      <span className="text-[hsl(var(--fg-muted))]">{w.topic}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="chip chip-danger">{w.accuracy}%</span>
+                      <ArrowRight className="w-3 h-3 text-[hsl(var(--accent))] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubjectCompletionCard({ subjects }) {
+  return (
+    <div className="card-2 p-5" data-testid={TID.pulseSubjectCompletion}>
+      <div className="flex items-center gap-2 mb-3">
+        <BookOpen className="w-4 h-4 text-[hsl(var(--info))]" />
+        <h3 className="font-semibold text-sm">Subject Completion</h3>
+        <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--fg-subtle))] ml-1">sorted by completion</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+        {subjects.map((s) => (
+          <div key={s.subject} className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <span className="w-8 shrink-0 mono text-[11px]">{s.subject}</span>
+            <span className="text-[11px] text-[hsl(var(--fg-muted))] flex-1 truncate min-w-0">{SUBJECT_LABELS[s.subject]}</span>
+            <span className="text-[11px] mono text-[hsl(var(--fg-muted))] w-12 text-right shrink-0">{s.completed}/{s.total}</span>
+            <div className="w-16 sm:w-20 h-1.5 bg-[hsl(var(--bg-elev-2))] rounded overflow-hidden shrink-0">
+              <div className={`h-full transition-all duration-300 ${MASTERY_COLOR(s.mastery_avg)}`} style={{ width: `${s.percent}%` }} />
+            </div>
+            <span className="mono text-[11px] w-8 text-right shrink-0">{s.percent}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ProgressLine({ label, value, target, pct }) {
   return (
     <div>
@@ -208,21 +316,7 @@ function ProgressLine({ label, value, target, pct }) {
         <span className="mono">{value}/{target}</span>
       </div>
       <div className="w-full h-1.5 bg-[hsl(var(--bg-elev-2))] rounded mt-1 overflow-hidden">
-        <div className="h-full bg-[hsl(var(--accent))]" style={{ width: `${Math.min(100, pct)}%` }} />
-      </div>
-    </div>
-  );
-}
-
-function ReadinessRow({ label, value, sub }) {
-  return (
-    <div className="mb-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-[hsl(var(--fg-muted))]">{label}</span>
-        <span className="mono font-semibold">{value}% {sub && <span className="text-[hsl(var(--fg-subtle))] text-xs ml-1">{sub}</span>}</span>
-      </div>
-      <div className="w-full h-1.5 bg-[hsl(var(--bg-elev-2))] rounded mt-1 overflow-hidden">
-        <div className="h-full bg-[hsl(var(--accent))]" style={{ width: `${Math.min(100, value)}%` }} />
+        <div className="h-full bg-[hsl(var(--accent))] transition-all duration-300" style={{ width: `${Math.min(100, pct)}%` }} />
       </div>
     </div>
   );

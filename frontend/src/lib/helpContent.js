@@ -52,12 +52,16 @@ export const HELP_CONTENT = {
         body: "Your daily dashboard. Tells you exactly what to do today and how prepared you are for GATE in one screen.",
       },
       {
+        title: "Preparation Snapshot",
+        body: "Four independent metrics derived from your data — no overall score. Subject Coverage: % of questions with 1 correct solve + 2 SRS revisions. Question Mastery: average mastery across all attempted questions. Revision Completion: revision sessions in last 7 days. Mock Readiness: activates once you log a Mock Test. Hover any metric for details.",
+      },
+      {
         title: "Today's Mission",
         body: "Top 4 highest-leverage actions for today — auto-prioritized: due revisions first, then due revisits, then weakest topic, then a fresh-question quota. Click any item to jump straight into it.",
       },
       {
         title: "Momentum & Weakness Engine",
-        body: "Momentum is a 7-day score rewarding consistency + subject diversity + revision completion. The Weakness Engine surfaces subject-topic pairs with <70% accuracy over the last 30 days so you can hit them next.",
+        body: "Momentum is a 7-day consistency score with a sparkline of daily minutes. The arrow shows whether you're improving or declining vs last week. The Weakness Engine surfaces subject-topic pairs with <70% accuracy over the last 30 days.",
       },
       {
         title: "Tips",
