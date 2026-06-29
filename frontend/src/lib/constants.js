@@ -7,6 +7,7 @@ export const SUBJECT_LABELS = {
 export const ACTIVITIES = ["Lecture", "Practice", "Revision", "Mock Test", "Reading"];
 export const QUESTION_TYPES = ["MCQ", "MSQ", "NAT"];
 export const DIFFICULTIES = ["Easy", "Medium", "Hard"];
+export const EXAM_SOURCES = ["GATE", "ISRO", "GO DPP", "GO Weekly Quiz", "GO Subject Test", "GO Mock", "Other"];
 export const REVISIT_PRESETS = [
   { days: 1, label: "Tomorrow" },
   { days: 3, label: "+3 days" },

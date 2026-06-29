@@ -77,6 +77,17 @@ def strip_id(d):
 
 
 # ============================== MODELS ==============================
+EXAM_SOURCES = [
+    "GATE",
+    "ISRO",
+    "GO DPP",
+    "GO Weekly Quiz",
+    "GO Subject Test",
+    "GO Mock",
+    "Other",
+]
+
+
 class Question(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     subject: str
@@ -89,6 +100,8 @@ class Question(BaseModel):
     )
     explanation: str = ""
     gateoverflow_url: str = ""
+    exam_source: str = "GATE"
+    exam_source_other: str = ""
     year: Optional[int] = None
     difficulty: Literal["Easy", "Medium", "Hard"] = "Medium"
     bookmarked: bool = False
@@ -106,6 +119,8 @@ class QuestionCreate(BaseModel):
     correct_answer: str = ""
     explanation: str = ""
     gateoverflow_url: str = ""
+    exam_source: str = "GATE"
+    exam_source_other: str = ""
     year: Optional[int] = None
     difficulty: Literal["Easy", "Medium", "Hard"] = "Medium"
     bookmarked: bool = False
@@ -121,6 +136,8 @@ class QuestionUpdate(BaseModel):
     correct_answer: Optional[str] = None
     explanation: Optional[str] = None
     gateoverflow_url: Optional[str] = None
+    exam_source: Optional[str] = None
+    exam_source_other: Optional[str] = None
     year: Optional[int] = None
     difficulty: Optional[str] = None
     bookmarked: Optional[bool] = None
@@ -1403,6 +1420,7 @@ SAMPLE_QUESTIONS = [
     {
         "subject": "OS",
         "topic": "Process Synchronization",
+        "exam_source": "GATE",
         "year": 2023,
         "difficulty": "Medium",
         "question_type": "MCQ",
@@ -1420,6 +1438,7 @@ SAMPLE_QUESTIONS = [
     {
         "subject": "DS",
         "topic": "Trees",
+        "exam_source": "GATE",
         "year": 2022,
         "difficulty": "Easy",
         "question_type": "NAT",
@@ -1431,6 +1450,7 @@ SAMPLE_QUESTIONS = [
     {
         "subject": "DB",
         "topic": "Normalization",
+        "exam_source": "GATE",
         "year": 2024,
         "difficulty": "Hard",
         "question_type": "MSQ",
@@ -1448,6 +1468,7 @@ SAMPLE_QUESTIONS = [
     {
         "subject": "AL",
         "topic": "Dynamic Programming",
+        "exam_source": "GATE",
         "year": 2021,
         "difficulty": "Medium",
         "question_type": "MCQ",
@@ -1465,6 +1486,7 @@ SAMPLE_QUESTIONS = [
     {
         "subject": "CN",
         "topic": "TCP",
+        "exam_source": "GATE",
         "year": 2023,
         "difficulty": "Medium",
         "question_type": "MCQ",
@@ -1482,6 +1504,7 @@ SAMPLE_QUESTIONS = [
     {
         "subject": "TOC",
         "topic": "Regular Languages",
+        "exam_source": "GATE",
         "year": 2020,
         "difficulty": "Easy",
         "question_type": "MCQ",
@@ -1499,6 +1522,7 @@ SAMPLE_QUESTIONS = [
     {
         "subject": "COA",
         "topic": "Cache",
+        "exam_source": "GATE",
         "year": 2022,
         "difficulty": "Medium",
         "question_type": "NAT",
@@ -1510,6 +1534,7 @@ SAMPLE_QUESTIONS = [
     {
         "subject": "DM",
         "topic": "Sets and Functions",
+        "exam_source": "GATE",
         "year": 2024,
         "difficulty": "Easy",
         "question_type": "MCQ",

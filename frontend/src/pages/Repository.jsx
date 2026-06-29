@@ -4,7 +4,7 @@ import { Search, Plus, Star, Trash2, Edit3, Play, Upload, Download, ExternalLink
 import Papa from "papaparse";
 import { questionsApi, seed } from "@/lib/api";
 import { SUBJECTS, TID } from "@/lib/constants";
-import { debounce, fmtDate, relLabel } from "@/lib/dateUtils";
+import { debounce, relLabel, relDays } from "@/lib/dateUtils";
 import QuestionFormModal from "@/components/QuestionFormModal";
 import QuestionDetailsModal from "@/components/QuestionDetailsModal";
 import OcrPromptModal from "@/components/OcrPromptModal";
@@ -12,6 +12,51 @@ import RevisitMenu from "@/components/RevisitMenu";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import HelpButton from "@/components/HelpButton";
 import { HELP_CONTENT } from "@/lib/helpContent";
+
+// --- small helpers reused by RepoRow ---
+function escapeRx(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function stripMarkdown(text) {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[#>~|]/g, '');
+}
+
+function HighlightedStatement({ statement, search }) {
+  const display = statement.length > 150 ? statement.slice(0, 150) + "…" : statement;
+  if (!search) {
+    return <MarkdownRenderer>{display}</MarkdownRenderer>;
+  }
+  const clean = stripMarkdown(display);
+  const parts = clean.split(new RegExp(`(${escapeRx(search.trim())})`, 'gi'));
+  return (
+    <span className="text-[13px] leading-snug">
+      {parts.map((part, i) =>
+        i % 2 === 1
+          ? <mark key={i} className="bg-[hsl(var(--warning))]/25 text-[hsl(var(--fg))] rounded-sm px-0.5">{part}</mark>
+          : part
+      )}
+    </span>
+  );
+}
+
+function RevBadge({ date }) {
+  if (!date) return <span className="text-xs text-[hsl(var(--fg-muted))]">—</span>;
+  const days = relDays(date);
+  const label = relLabel(date);
+  const color =
+    days == null ? "text-[hsl(var(--fg-muted))]"
+    : days <= 0 ? "chip-danger"
+    : days <= 3 ? "chip-warning"
+    : "text-[hsl(var(--fg-muted))]";
+  return <span className={`text-[11px] ${color}`}>{label}</span>;
+}
 
 const FILTER_MODES = [
   { value: "", label: "All" },
@@ -149,7 +194,7 @@ export default function Repository() {
       subject: r.subject, topic: r.topic, question_type: r.question_type,
       statement: r.statement, options: r.options, correct_answer: r.correct_answer,
       explanation: r.explanation, gateoverflow_url: r.gateoverflow_url,
-      year: r.year, difficulty: r.difficulty, bookmarked: r.bookmarked, notes: r.notes,
+      exam_source: r.exam_source, year: r.year, difficulty: r.difficulty, bookmarked: r.bookmarked, notes: r.notes,
     }));
     await questionsApi.bulkCreate(rows);
     setUndoBuffer(null);
@@ -161,7 +206,7 @@ export default function Repository() {
       subject: q.subject, topic: q.topic, question_type: q.question_type,
       statement: q.statement, options: (q.options || []).join("|"),
       correct_answer: q.correct_answer, explanation: q.explanation,
-      gateoverflow_url: q.gateoverflow_url, year: q.year || "",
+      gateoverflow_url: q.gateoverflow_url, exam_source: q.exam_source || "GATE", year: q.year || "",
       difficulty: q.difficulty, bookmarked: q.bookmarked, notes: q.notes,
     }));
     const csv = Papa.unparse(rows);
@@ -258,8 +303,8 @@ export default function Repository() {
       {/* List */}
       <div className="card-2 overflow-hidden">
         <div className="overflow-x-auto">
-        <div className="min-w-[780px]">
-        <div className="grid grid-cols-[28px_58px_68px_1fr_72px_92px_80px_132px] px-4 py-2.5 text-[10px] font-semibold tracking-[0.12em] uppercase text-[hsl(var(--fg-subtle))] border-b-2 border-border bg-[hsl(var(--bg-elev-2))] sticky top-0 z-10">
+        <div className="min-w-[870px]">
+        <div className="grid grid-cols-[28px_44px_40px_1fr_70px_70px_66px_136px] px-4 py-2 text-[10px] font-semibold tracking-[0.12em] uppercase text-[hsl(var(--fg-subtle))] border-b-2 border-border bg-[hsl(var(--bg-elev-2))] sticky top-0 z-10">
           <input type="checkbox" checked={items.length > 0 && selected.size === items.length} onChange={toggleAll} className="accent-[hsl(var(--accent))]" />
           <SortHeader label="Subj" onClick={() => toggleSort("subject")} icon={sortIcon("subject")} />
           <SortHeader label="Type" onClick={() => toggleSort("type")} icon={sortIcon("type")} />
@@ -272,15 +317,15 @@ export default function Repository() {
 
         {loading ? (
           [...Array(6)].map((_, i) => (
-            <div key={i} className="grid grid-cols-[28px_58px_68px_1fr_72px_92px_80px_132px] gap-2.5 px-4 py-3 border-b border-border/50">
-              {[...Array(8)].map((_, j) => <div key={j} className="skeleton h-4" />)}
+            <div key={i} className="grid grid-cols-[28px_44px_40px_1fr_70px_70px_66px_136px] gap-2.5 px-4 py-2 border-b border-border/50">
+              {[...Array(8)].map((_, j) => <div key={j} className="skeleton h-3.5" />)}
             </div>
           ))
         ) : sortedItems.length === 0 ? (
           <EmptyRepo onSeed={onSeed} onNew={startNew} />
         ) : (
           sortedItems.map((q) => (
-            <RepoRow key={q.id} q={q} selected={selected.has(q.id)}
+            <RepoRow key={q.id} q={q} selected={selected.has(q.id)} search={search}
               onToggle={() => toggleSelect(q.id)}
               onBookmark={() => toggleBookmark(q)}
               onEdit={() => startEdit(q)}
@@ -331,10 +376,9 @@ function SortHeader({ label, align, onClick, icon }) {
   );
 }
 
-function RepoRow({ q, selected, onToggle, onBookmark, onEdit, onDelete, onPractice, onRevisited, onOpenDetails }) {
+function RepoRow({ q, selected, search, onToggle, onBookmark, onEdit, onDelete, onPractice, onRevisited, onOpenDetails }) {
   const mastery = q.mastery ?? 0;
-  const masteryColor = mastery >= 80 ? "chip-success" : mastery >= 40 ? "chip-warning" : "chip-danger";
-  // Prevent double-click selecting text in the row.
+  const masteryBarColor = mastery >= 80 ? "bg-[hsl(var(--success))]" : mastery >= 40 ? "bg-[hsl(var(--warning))]" : "bg-[hsl(var(--danger))]";
   const handleDoubleClick = (e) => {
     if (e.target.closest("button, a, input, [data-no-dbl]")) return;
     if (window.getSelection) window.getSelection().removeAllRanges();
@@ -343,30 +387,62 @@ function RepoRow({ q, selected, onToggle, onBookmark, onEdit, onDelete, onPracti
   return (
     <div data-testid={TID.repoRow(q.id)}
       onDoubleClick={handleDoubleClick}
-      className={`grid grid-cols-[28px_58px_68px_1fr_72px_92px_80px_132px] gap-2.5 items-center px-4 py-3 border-b border-border/50 text-sm cursor-default select-none transition-colors ${
-        selected ? "bg-[hsl(var(--accent))]/10 border-l-2 border-l-[hsl(var(--accent))]" : "hover:bg-[hsl(var(--bg-elev))]"
+      className={`grid grid-cols-[28px_44px_40px_1fr_70px_70px_66px_136px] gap-2 items-center px-4 py-2 border-b border-border/50 text-sm cursor-default select-none transition-colors ${
+        selected ? "bg-[hsl(var(--accent))]/10 border-l-2 border-l-[hsl(var(--accent))]" : "hover:bg-[hsl(var(--bg-elev))]/80"
       }`}>
       <input data-testid={TID.repoRowCheckbox(q.id)} type="checkbox" checked={selected} onChange={onToggle} data-no-dbl className="accent-[hsl(var(--accent))]" />
-      <span className="chip">{q.subject}</span>
-      <span className="text-xs text-[hsl(var(--fg-muted))] mono">{q.question_type}</span>
-      <div className="min-w-0 truncate" title={q.statement}>
-        <span className="text-[hsl(var(--fg-muted))] mr-1 text-xs mono">{q.topic || "—"}</span>
-        <MarkdownRenderer>{q.statement.length > 110 ? q.statement.slice(0, 110) + "…" : q.statement}</MarkdownRenderer>
+
+      {/* Subject badge - slightly stronger */}
+      <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold rounded border border-[hsl(var(--accent))]/40 bg-[hsl(var(--accent))]/10 text-[hsl(var(--accent))]">
+        {q.subject}
+      </span>
+
+      {/* Type */}
+      <span className="text-[10px] text-[hsl(var(--fg-muted))] mono font-medium">{q.question_type}</span>
+
+      {/* Statement + metadata chips */}
+      <div className="min-w-0">
+        <div className="truncate" title={q.statement}>
+          <HighlightedStatement statement={q.statement} search={search} />
+        </div>
+        <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+          <span className="text-[9px] tracking-wider uppercase text-[hsl(var(--fg-subtle))] mono">{q.question_type}</span>
+          {q.topic && <span className="text-[9px] tracking-wider uppercase text-[hsl(var(--fg-subtle))] ml-0.5">· {q.topic}</span>}
+          {q.exam_source && <span className="text-[9px] tracking-wider uppercase text-[hsl(var(--fg-subtle))] ml-0.5">· {q.exam_source}{q.year ? ` ${q.year}` : ""}</span>}
+        </div>
       </div>
-      <span className={`chip ${masteryColor} justify-self-end`}>{mastery}</span>
-      <span className="text-xs text-[hsl(var(--fg-muted))] justify-self-end">{q.next_revision_date ? relLabel(q.next_revision_date) : "—"}</span>
-      <span className="text-xs text-[hsl(var(--fg-muted))] justify-self-end">{q.next_revisit_date ? relLabel(q.next_revisit_date) : "—"}</span>
-      <div className="flex items-center gap-0.5 justify-self-end">
-        <button data-testid={TID.repoRowBookmark(q.id)} onClick={onBookmark} className="btn-ghost p-1.5" title="Bookmark">
+
+      {/* Mastery bar + percentage */}
+      <div className="flex items-center gap-1.5 justify-self-end w-full max-w-[60px]">
+        <div className="flex-1 h-1 bg-[hsl(var(--bg-elev-2))] rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${masteryBarColor}`} style={{ width: `${mastery}%` }} />
+        </div>
+        <span className="text-[11px] mono text-[hsl(var(--fg-muted))] w-7 text-right">{mastery}</span>
+      </div>
+
+      {/* Next revision - color coded */}
+      <div className="justify-self-end">
+        <RevBadge date={q.next_revision_date} />
+      </div>
+
+      {/* Revisit date */}
+      <div className="justify-self-end">
+        <RevBadge date={q.next_revisit_date} />
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1.5 justify-self-end">
+        <button data-testid={TID.repoRowBookmark(q.id)} onClick={onBookmark} className="btn-ghost p-1" title="Bookmark">
           <Star className={`w-3.5 h-3.5 ${q.bookmarked ? "fill-yellow-400 text-yellow-400" : "text-[hsl(var(--fg-muted))]"}`} />
         </button>
-        <button data-testid={TID.repoRowPractice(q.id)} onClick={onPractice} className="btn-ghost p-1.5" title="Practice"><Play className="w-3.5 h-3.5" /></button>
+        <button data-testid={TID.repoRowPractice(q.id)} onClick={onPractice} className="btn-ghost p-1" title="Practice"><Play className="w-3.5 h-3.5" /></button>
         <RevisitMenu itemType="question" itemId={q.id} itemTitle={q.statement.slice(0, 60)} itemSubject={q.subject} onScheduled={onRevisited} compact />
-        <button data-testid={TID.repoRowEdit(q.id)} onClick={onEdit} className="btn-ghost p-1.5" title="Edit"><Edit3 className="w-3.5 h-3.5" /></button>
-        <button data-testid={TID.repoRowDelete(q.id)} onClick={onDelete} className="btn-ghost p-1.5 text-[hsl(var(--danger))]" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+        <button data-testid={TID.repoRowEdit(q.id)} onClick={onEdit} className="btn-ghost p-1" title="Edit"><Edit3 className="w-3.5 h-3.5" /></button>
         {q.gateoverflow_url && (
-          <a href={q.gateoverflow_url} target="_blank" rel="noreferrer" className="btn-ghost p-1.5 text-[hsl(var(--info))]" title="GateOverflow"><ExternalLink className="w-3.5 h-3.5" /></a>
+          <a href={q.gateoverflow_url} target="_blank" rel="noreferrer" className="btn-ghost p-1 text-[hsl(var(--info))]" title="GateOverflow"><ExternalLink className="w-3.5 h-3.5" /></a>
         )}
+        <span className="w-px h-4 bg-border/70 mx-0.5" />
+        <button data-testid={TID.repoRowDelete(q.id)} onClick={onDelete} className="btn-ghost p-1 text-[hsl(var(--danger))] hover:bg-[hsl(var(--danger))]/10" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
       </div>
     </div>
   );

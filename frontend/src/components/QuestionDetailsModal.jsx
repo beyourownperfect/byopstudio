@@ -44,7 +44,7 @@ export default function QuestionDetailsModal({ open, onClose, questionId, onEdit
     <Modal
       open={open}
       onClose={onClose}
-      title={q ? `${q.subject} · ${q.question_type}${q.year ? ` · ${q.year}` : ""}` : "Question details"}
+      title={q ? `${q.subject} · ${q.question_type}${q.exam_source ? ` · ${q.exam_source}` : ""}${q.year ? ` ${q.year}` : ""}` : "Question details"}
       size="lg"
       footer={
         <>
@@ -88,7 +88,7 @@ export default function QuestionDetailsModal({ open, onClose, questionId, onEdit
               <span className="chip chip-accent">{q.subject}</span>
               {q.topic && <span className="chip">{q.topic}</span>}
               <span className="chip">{q.question_type}</span>
-              {q.year && <span className="chip">PYQ {q.year}</span>}
+              {q.exam_source && <span className="chip">{q.exam_source}{q.year ? ` ${q.year}` : ""}</span>}
               <span className="chip">{q.difficulty}</span>
               <span className={`chip ${masteryColor}`} title="Mastery (0–100)">
                 <Target className="w-3 h-3" /> {mastery}

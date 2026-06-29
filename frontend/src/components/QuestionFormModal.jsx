@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import Modal from "@/components/Modal";
-import { SUBJECTS, QUESTION_TYPES, DIFFICULTIES, TID } from "@/lib/constants";
+import { SUBJECTS, QUESTION_TYPES, DIFFICULTIES, EXAM_SOURCES, TID } from "@/lib/constants";
 import { questionsApi } from "@/lib/api";
 import usePasteMarkdown from "@/lib/usePasteMarkdown";
 
 const empty = {
   subject: "OS", topic: "", question_type: "MCQ", statement: "",
   options: ["", "", "", ""], correct_answer: "", explanation: "",
-  gateoverflow_url: "", year: "", difficulty: "Medium", bookmarked: false, notes: "",
+  gateoverflow_url: "", exam_source: "GATE", exam_source_other: "", year: "", difficulty: "Medium", bookmarked: false, notes: "",
 };
 
 export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
@@ -20,11 +20,16 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
         ...empty, ...editing,
         options: editing.options?.length ? editing.options : ["", "", "", ""],
         year: editing.year ?? "",
+        exam_source_other: editing.exam_source_other || (editing.exam_source && !EXAM_SOURCES.includes(editing.exam_source) ? editing.exam_source : ""),
+        exam_source: editing.exam_source && EXAM_SOURCES.includes(editing.exam_source) ? editing.exam_source : "Other",
+        difficulty: editing.difficulty || "Medium",
       });
     } else {
       setForm(empty);
     }
   }, [editing, open]);
+
+  const hasAttempts = editing?.srs?.total_attempts > 0;
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setOption = (i, v) => setForm((f) => {
@@ -37,6 +42,7 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
     e.preventDefault();
     const payload = {
       ...form,
+      exam_source: form.exam_source === "Other" ? (form.exam_source_other || "Other") : form.exam_source,
       year: form.year ? parseInt(form.year) : null,
       options: form.question_type === "NAT" ? [] : form.options.filter((o) => o.trim()),
     };
@@ -75,19 +81,43 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
           </div>
           <div>
             <label className="label-x">Difficulty</label>
-            <select data-testid={TID.qFormDifficulty} value={form.difficulty} onChange={(e) => set("difficulty", e.target.value)} className="input mt-1">
+            <select
+              data-testid={TID.qFormDifficulty}
+              value={form.difficulty}
+              onChange={(e) => set("difficulty", e.target.value)}
+              className="input mt-1"
+              disabled={editing && !hasAttempts}
+              title={!hasAttempts && editing ? "Difficulty unlocks after first attempt" : ""}
+            >
               {DIFFICULTIES.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
+            {!hasAttempts && editing && <p className="text-[10px] text-[hsl(var(--fg-muted))] mt-0.5">unlocks after first attempt</p>}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label-x">Exam / Source</label>
+            <select value={form.exam_source} onChange={(e) => set("exam_source", e.target.value)} className="input mt-1">
+              {EXAM_SOURCES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            {form.exam_source === "Other" && (
+              <input
+                value={form.exam_source_other}
+                onChange={(e) => set("exam_source_other", e.target.value)}
+                className="input mt-1.5"
+                placeholder="Specify source"
+              />
+            )}
+          </div>
+          <div>
+            <label className="label-x">Year (optional)</label>
+            <input data-testid={TID.qFormYear} type="number" value={form.year} onChange={(e) => set("year", e.target.value)} className="input mt-1" placeholder="2024" />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label-x">Topic</label>
             <input data-testid={TID.qFormTopic} value={form.topic} onChange={(e) => set("topic", e.target.value)} className="input mt-1" placeholder="e.g. Process Synchronization" />
-          </div>
-          <div>
-            <label className="label-x">Year (PYQ)</label>
-            <input data-testid={TID.qFormYear} type="number" value={form.year} onChange={(e) => set("year", e.target.value)} className="input mt-1" placeholder="2024" />
           </div>
         </div>
         <div>
