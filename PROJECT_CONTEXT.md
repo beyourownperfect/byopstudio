@@ -23,26 +23,30 @@ A single-user web app that replaces a study planner with a closed-loop habit eng
 | Frontend | React 19 (CRA + craco), TailwindCSS, Radix UI primitives, lucide-react icons, KaTeX (`react-katex`), react-router-dom v7 |
 | Backend | FastAPI, Motor (async MongoDB), Pydantic v2, Uvicorn (managed by supervisor) |
 | Database | MongoDB (single database `os.environ['DB_NAME']`) |
-| Build/deploy | Frontend → Vercel (CRA preset, SPA rewrites in `frontend/vercel.json`). Backend → any long-lived host (Render/Railway/Fly/Emergent preview). |
-| Process mgmt | Supervisor in container (backend :8001, frontend :3000) |
-| Routing | Kubernetes ingress: `/api/*` → backend :8001, everything else → frontend :3000 |
+| Build/deploy | Render (single web service). FastAPI serves the React build via `StaticFiles`; SPA fallback via catch-all route. MongoDB Atlas for persistence. |
+| Process mgmt | Uvicorn on Render (single process, single port via `$PORT`) |
+| Routing | `/api/*` → FastAPI routes. Everything else → React SPA (served by FastAPI). |
 | Auth | None — single user. |
 
 ---
 
 ## 3. Folder structure
 
-```
-/app
+```/app
+├── render.yaml              # Render Blueprint — single-service deploy
+├── DEPLOYMENT.md
+├── .gitignore
 ├── backend/
-│   ├── server.py            # All API routes, models, helpers, seed in one file
+│   ├── server.py            # All API routes, models, helpers, seed, StaticFiles for React build
 │   ├── requirements.txt
 │   ├── pytest.ini
+│   ├── Procfile
 │   ├── tests/               # backend_test.py, test_pre_deploy_review.py
-│   └── .env                 # MONGO_URL, DB_NAME, CORS_ORIGINS (protected)
+│   ├── .env.example
+│   └── .env                 # MONGO_URL, DB_NAME, CORS_ORIGINS (gitignored)
 ├── frontend/
 │   ├── package.json, craco.config.js, tailwind.config.js, postcss.config.js
-│   ├── vercel.json          # SPA rewrites + CRA build preset
+│   ├── .env.example
 │   ├── public/index.html
 │   └── src/
 │       ├── App.js           # Router + routes
@@ -342,9 +346,9 @@ score  = min(100, score)
 
 ## 11. Current version
 
-- Tag: **v1.0** (frozen). Header still displays "v1.1" (build tag — leave as-is unless re-released).
+- Tag: **v1.0** (frozen). Header displays "v1.1" (build tag — leave as-is unless re-released).
 - Backend `/api/` returns `{"app": "BYOPGateCS.studio", "status": "ok"}`.
-- Vercel-ready frontend (`frontend/vercel.json`); backend needs a separate long-running host.
+- Render-only deployment: FastAPI serves the React build via `StaticFiles` with SPA fallback. `render.yaml` included with full build pipeline.
 
 ### v1.0 — frozen state (open-source baseline)
 - Question Details Modal (LaTeX, attempts, mastery, revision status, GateOverflow).
@@ -362,7 +366,7 @@ score  = min(100, score)
 ## 12. Pending improvements (P0 → P3)
 
 ### P0 — production hardening
-- Replace N+1 patterns in `list_questions`, `/practice/next?mode=wrong/new`, `/pulse` with batch `$in` fetches and `db.attempts.distinct("question_id")`.
+- ~~Replace N+1 patterns in `list_questions`~~ ✅ Done (v1.0). Uses `$in` batch fetches and aggregation pipeline for attempts.
 - Server-side pagination on Repository (currently `limit=1000`).
 
 ### P1 — UX polish
@@ -387,28 +391,24 @@ score  = min(100, score)
 
 ## 13. Deployment notes
 
-### Vercel (frontend)
+### Render (single service)
 ```
-Project root:    /app/frontend
-Framework:       Create React App (auto-detected from vercel.json)
-Build command:   yarn build
-Output dir:      build
-Env vars:        REACT_APP_BACKEND_URL=<your-backend-https-url>
+render.yaml at repo root defines the full pipeline:
+  buildCommand: pip install -r backend/requirements.txt && cd frontend && yarn install --frozen-lockfile && yarn build
+  startCommand: cd backend && uvicorn server:app --host 0.0.0.0 --port $PORT
 ```
-`vercel.json` already includes SPA rewrites (`/(.*)` → `/index.html`).
 
-### Backend hosting
-- Vercel serverless is incompatible with the long-lived Motor/Mongo client.
-- Recommended: Render, Railway, Fly.io, or the Emergent preview itself.
-- Required env: `MONGO_URL`, `DB_NAME`, `CORS_ORIGINS=<vercel-domain>` (comma-separated for multiple).
+FastAPI serves:
+- `/api/*` — all backend routes
+- `/static/*` — CRA's JS/CSS/media
+- Everything else — `index.html` (React SPA fallback for React Router)
+
+Env vars on Render: `MONGO_URL`, `DB_NAME`, `CORS_ORIGINS` (set to the Render URL).
 
 ### Healthcheck
 - `GET /api/` returns 200 `{"app":"BYOPGateCS.studio","status":"ok"}`.
 
----
+### `.env.example` files
+Committed in both `backend/` and `frontend/` with full inline documentation.
 
-- `.env.example` files are committed in both `backend/` and `frontend/`.
-- Backend env: `MONGO_URL`, `DB_NAME`, `CORS_ORIGINS`.
-- Frontend env: `REACT_APP_BACKEND_URL` (and optionally `WDS_SOCKET_PORT`).
-
-*Last updated: 2026-06-27 (v1.0 — frozen open-source baseline).*
+*Last updated: 2026-06-29 (v1.0 — Render single-service deployment, N+1 fix, CORS fix).*

@@ -1,8 +1,9 @@
 import axios from "axios";
 
-const BACKEND_URL =
-  process.env.REACT_APP_BACKEND_URL || "http://127.0.0.1:8000";
-export const API = `${BACKEND_URL}/api`;
+// When REACT_APP_BACKEND_URL is set (local dev, separate deploys), use it.
+// When absent (Render single-service deployment or unset), default to same-origin "".
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
+export const API = BACKEND_URL ? `${BACKEND_URL}/api` : "/api";
 
 const c = axios.create({
   baseURL: API,

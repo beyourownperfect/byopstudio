@@ -4,6 +4,8 @@ Single-user backend. MongoDB. FastAPI.
 """
 
 from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -331,29 +333,49 @@ async def list_questions(
         .to_list(limit)
     )
 
-    # Enrich each with srs + last attempt
+    # Batch-fetch enrichment data in 3 queries instead of N+1 per question
     today = today_iso()
+    qids = [q["id"] for q in docs]
+
+    # 1. All SRS records for these questions
+    srs_docs = await db.srs.find({"question_id": {"$in": qids}}, {"_id": 0}).to_list(limit)
+    srs_map = {s["question_id"]: s for s in srs_docs}
+
+    # 2. Latest attempt per question (via aggregation for efficiency)
+    last_attempt_map: Dict[str, dict] = {}
+    if qids:
+        pipeline = [
+            {"$match": {"question_id": {"$in": qids}}},
+            {"$sort": {"created_at": -1}},
+            {"$group": {"_id": "$question_id", "doc": {"$first": "$$ROOT"}}},
+        ]
+        async for g in db.attempts.aggregate(pipeline):
+            doc = g["doc"]
+            doc.pop("_id", None)
+            last_attempt_map[g["_id"]] = doc
+
+    # 3. Revisit data: last and next (upcoming) per question
+    all_revisits = await db.revisits.find(
+        {"item_type": "question", "item_id": {"$in": qids}}, {"_id": 0}
+    ).sort("revisit_date", -1).to_list(limit * 4)
+    last_revisit_map: Dict[str, dict] = {}
+    next_revisit_map: Dict[str, dict] = {}
+    for rv in all_revisits:
+        qid = rv["item_id"]
+        if qid not in last_revisit_map:
+            last_revisit_map[qid] = rv
+        if not rv.get("completed") and rv.get("revisit_date", "") >= today:
+            existing = next_revisit_map.get(qid)
+            if not existing or rv["revisit_date"] < existing["revisit_date"]:
+                next_revisit_map[qid] = rv
+
     enriched = []
     for q in docs:
-        srs = await db.srs.find_one({"question_id": q["id"]}, {"_id": 0}) or {}
-        last_attempt = await db.attempts.find_one(
-            {"question_id": q["id"]}, {"_id": 0}, sort=[("created_at", -1)]
-        )
-        last_revisit = await db.revisits.find_one(
-            {"item_type": "question", "item_id": q["id"]},
-            {"_id": 0},
-            sort=[("revisit_date", -1)],
-        )
-        next_revisit_doc = await db.revisits.find_one(
-            {
-                "item_type": "question",
-                "item_id": q["id"],
-                "completed": False,
-                "revisit_date": {"$gte": today},
-            },
-            {"_id": 0},
-            sort=[("revisit_date", 1)],
-        )
+        qid = q["id"]
+        srs = srs_map.get(qid, {})
+        last_attempt = last_attempt_map.get(qid)
+        last_revisit = last_revisit_map.get(qid)
+        next_revisit_doc = next_revisit_map.get(qid)
         q["srs"] = srs
         q["mastery"] = _compute_mastery(srs)
         q["last_attempt"] = last_attempt
@@ -1523,13 +1545,44 @@ async def seed_demo():
 
 # ============================ MOUNT =================================
 app.include_router(api_router)
+
+# CORS: in production, set CORS_ORIGINS to the Render URL; defaults to "*" for local dev
+cors_origins = os.environ.get("CORS_ORIGINS", "*").split(",")
+cors_origins = [o.strip() for o in cors_origins if o.strip()]
+if not cors_origins:
+    cors_origins = ["*"]
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=False,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve the React production build from frontend/build/ (Render single-service deployment)
+BUILD_DIR = (ROOT_DIR / ".." / "frontend" / "build").resolve()
+if BUILD_DIR.is_dir():
+    # Mount /static for JS/CSS/media assets produced by CRA
+    app.mount("/static", StaticFiles(directory=str(BUILD_DIR / "static")), name="static")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Serve the React SPA. /api/* is handled by api_router. All other paths
+        serve static files from the build dir, falling back to index.html for
+        React Router client-side routing."""
+        file_path = BUILD_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(BUILD_DIR / "index.html")
+else:
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_placeholder(full_path: str):
+        if full_path in ("", "/"):
+            return {
+                "message": "BYOPGateCS.studio — frontend build not found. "
+                "Run `cd frontend && yarn build` or use `yarn start` for dev mode on port 3000."
+            }
+        raise HTTPException(404, "Frontend build not found. Run `cd frontend && yarn build`.")
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
