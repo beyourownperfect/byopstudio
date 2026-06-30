@@ -1,9 +1,6 @@
-export const SUBJECTS = ["C", "DS", "AL", "OS", "DB", "COA", "TOC", "CD", "DL", "EM", "DM", "CN"];
-export const SUBJECT_LABELS = {
-  C: "C Programming", DS: "Data Structures", AL: "Algorithms", OS: "Operating Systems",
-  DB: "Databases", COA: "Computer Org.", TOC: "Theory of Computation", CD: "Compilers",
-  DL: "Digital Logic", EM: "Engg. Mathematics", DM: "Discrete Math", CN: "Computer Networks",
-};
+import { SUBJECTS, SUBJECT_LABELS } from "@/lib/gateSyllabus";
+
+export { SUBJECTS, SUBJECT_LABELS };
 export const ACTIVITIES = ["Lecture", "Practice", "Revision", "Mock Test", "Reading"];
 export const QUESTION_TYPES = ["MCQ", "MSQ", "NAT"];
 export const DIFFICULTIES = ["Easy", "Medium", "Hard"];

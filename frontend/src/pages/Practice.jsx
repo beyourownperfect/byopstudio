@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Star, ChevronRight, ChevronLeft, ExternalLink, Check, X as XIcon, Clock, Play, BarChart3 } from "lucide-react";
 import { practiceApi, questionsApi } from "@/lib/api";
 import { SUBJECTS, TID } from "@/lib/constants";
+import { topicsForSubject } from "@/lib/gateSyllabus";
 import { relLabel } from "@/lib/dateUtils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
@@ -24,6 +25,7 @@ export default function Practice() {
   const navigate = useNavigate();
   const [mode, setMode] = useState(sp.get("mode") || "due");
   const [subject, setSubject] = useState(sp.get("subject") || "ALL");
+  const [officialTopic, setOfficialTopic] = useState(sp.get("topic") || "");
   const [started, setStarted] = useState(false);
   const [q, setQ] = useState(null);
   const [answer, setAnswer] = useState("");
@@ -81,13 +83,14 @@ export default function Practice() {
     return () => window.removeEventListener("keydown", onKey);
   }, [started, q, feedback]); // eslint-disable-line
 
-  const fetchNext = async (m = mode, s = subject, exclude = excludeIds) => {
+  const fetchNext = async (m = mode, s = subject, ot = officialTopic, exclude = excludeIds) => {
     setFeedback(null);
     setAnswer("");
     setSelected(new Set());
     setConfidence(3);
     const params = { mode: m, exclude_ids: exclude.join(",") };
     if (s !== "ALL") params.subject = s;
+    if (ot) params.official_topic = ot;
     const next = await practiceApi.next(params);
     if (next) {
       setQueue((q) => {
@@ -189,8 +192,17 @@ export default function Practice() {
         </div>
         <div>
           <label className="label-x">Subject</label>
-          <SubjectSelect data-testid={TID.practiceSubjectSelect} value={subject} onChange={(e) => setSubject(e.target.value)} className="input mt-1" allOption />
+          <SubjectSelect data-testid={TID.practiceSubjectSelect} value={subject} onChange={(e) => { setSubject(e.target.value); setOfficialTopic(""); }} className="input mt-1" allOption />
         </div>
+        {subject !== "ALL" && topicsForSubject(subject).length > 0 && (
+          <div>
+            <label className="label-x">Topic (optional)</label>
+            <select value={officialTopic} onChange={(e) => setOfficialTopic(e.target.value)} className="input mt-1">
+              <option value="">All topics</option>
+              {topicsForSubject(subject).map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+            </select>
+          </div>
+        )}
         <button data-testid={TID.practiceStartBtn} onClick={start} className="btn btn-primary w-full">
           <Play className="w-3.5 h-3.5" /> Start
         </button>

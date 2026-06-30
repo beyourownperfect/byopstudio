@@ -150,11 +150,30 @@ export const GATE_SYLLABUS = {
     topics: {},
     note: "DS maps to C (Programming & Data Structures) + AL (Algorithms). Use the C and AL subject topics.",
   },
+  "DM": {
+    label: "Discrete Math",
+    topics: {},
+    note: "DM maps to EM (Engineering Mathematics). All Discrete Math topics live under EM.",
+  },
 };
 
-// Flattened topic key → label map
+// Derived exports — canonical subject list and labels, replacing constants.js duplicates.
+// Subject order preserved for backward compatibility.
+const SUBJECTS_ORDER = ["C", "DS", "AL", "OS", "DB", "COA", "TOC", "CD", "DL", "EM", "DM", "CN"];
+
+export const SUBJECTS = SUBJECTS_ORDER;
+
+export const SUBJECT_LABELS = {};
+for (const code of SUBJECTS_ORDER) {
+  if (GATE_SYLLABUS[code]) {
+    SUBJECT_LABELS[code] = GATE_SYLLABUS[code].label;
+  }
+}
+
+// Flattened topic key → label map (only real subjects, skip DS/DM virtual ones)
 export const ALL_TOPICS = {};
 for (const [subjCode, subj] of Object.entries(GATE_SYLLABUS)) {
+  if (!subj.topics || Object.keys(subj.topics).length === 0) continue;
   for (const [topicKey, topic] of Object.entries(subj.topics)) {
     ALL_TOPICS[topicKey] = `${subjCode} · ${topic.label}`;
   }
@@ -166,7 +185,7 @@ export const topicLabel = (key) => ALL_TOPICS[key] || key;
 // Get topics for a subject, with optional OTHER fallback
 export const topicsForSubject = (subjCode) => {
   const subj = GATE_SYLLABUS[subjCode];
-  if (!subj) return [];
+  if (!subj || !subj.topics) return [];
   return Object.entries(subj.topics).map(([key, t]) => ({ key, label: t.label }));
 };
 

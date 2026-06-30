@@ -210,7 +210,7 @@ function TopicReadinessCard({ topicReadiness, navigate }) {
                     return (
                       <button
                         key={t.key}
-                        onClick={() => navigate(`/solve/practice?subject=${subject}`)}
+                        onClick={() => navigate(`/solve/practice?subject=${subject}&topic=${t.key}`)}
                         className="w-full flex items-center gap-2 py-1 px-2 rounded hover:bg-[hsl(var(--bg-elev))]/40 transition-colors group"
                       >
                         <div className={`w-1.5 h-1.5 rounded-full ${isEmpty ? "bg-[hsl(var(--fg-subtle))]/30" : t.has_questions ? "bg-[hsl(var(--accent))]" : "bg-[hsl(var(--info))]"}`} />
@@ -367,7 +367,7 @@ function WeakTopicsCard({ weakTopics, expanded, toggle, navigate }) {
               {weakTopics.map((w, i) => (
                 <button
                   key={i}
-                  onClick={() => navigate(`/solve/practice?mode=weak&subject=${w.subject}`)}
+                  onClick={() => navigate(`/solve/practice?mode=weak&subject=${w.subject}${w.official_topic ? `&topic=${w.official_topic}` : ""}`)}
                   className="w-full text-left px-3 py-2.5 rounded border border-border hover:bg-[hsl(var(--bg-elev))] transition-colors group"
                 >
                   <div className="flex items-center justify-between text-sm">

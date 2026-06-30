@@ -4,6 +4,7 @@ import { Search, Plus, Star, Trash2, Edit3, Play, Upload, Download, ExternalLink
 import Papa from "papaparse";
 import { questionsApi, seed } from "@/lib/api";
 import { SUBJECTS, SUBJECT_LABELS, TID } from "@/lib/constants";
+import { topicsForSubject } from "@/lib/gateSyllabus";
 import SubjectSelect from "@/components/SubjectSelect";
 import { debounce, relLabel, relDays } from "@/lib/dateUtils";
 import QuestionFormModal from "@/components/QuestionFormModal";
@@ -66,6 +67,7 @@ export default function Repository() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(saved.search || "");
   const [subject, setSubject] = useState(sp.get("subject") || saved.subject || "ALL");
+  const [officialTopic, setOfficialTopic] = useState(sp.get("topic") || saved.officialTopic || "");
   const [filterMode, setFilterMode] = useState(sp.get("filter") || saved.filterMode || "");
   const [selected, setSelected] = useState(new Set());
   const [editing, setEditing] = useState(null);
@@ -81,6 +83,7 @@ export default function Repository() {
     setLoading(true);
     const params = {};
     if (subject !== "ALL") params.subject = subject;
+    if (officialTopic) params.official_topic = officialTopic;
     if (filterMode) params.filter_mode = filterMode;
     if (search) params.search = search;
     const res = await questionsApi.list(params);
@@ -88,17 +91,17 @@ export default function Repository() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [subject, filterMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [subject, filterMode, officialTopic]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const debouncedSearch = useMemo(() => debounce(() => load(), 220), [subject, filterMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  const debouncedSearch = useMemo(() => debounce(() => load(), 220), [subject, filterMode, officialTopic]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { debouncedSearch(); return () => debouncedSearch.cancel?.(); }, [search, debouncedSearch]);
 
   // Persist filters
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ subject, filterMode, search, sortBy }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ subject, filterMode, search, sortBy, officialTopic }));
     } catch (err) { console.error("[Repository] Failed to persist filters:", err); }
-  }, [subject, filterMode, search, sortBy]);
+  }, [subject, filterMode, search, sortBy, officialTopic]);
 
   // Client-side sorting layered over backend list
   const sortedItems = useMemo(() => {
@@ -228,8 +231,9 @@ export default function Repository() {
     const params = {};
     if (subject !== "ALL") params.subject = subject;
     if (filterMode) params.filter = filterMode;
+    if (officialTopic) params.topic = officialTopic;
     setSp(params, { replace: true });
-  }, [subject, filterMode, setSp]);
+  }, [subject, filterMode, officialTopic, setSp]);
 
   return (
     <div className="space-y-6">
@@ -278,7 +282,13 @@ export default function Repository() {
             className="input pl-8"
           />
         </div>
-        <SubjectSelect data-testid={TID.repoSubjectFilter} value={subject} onChange={(e) => setSubject(e.target.value)} className="input max-w-[220px]" allOption />
+        <SubjectSelect data-testid={TID.repoSubjectFilter} value={subject} onChange={(e) => { setSubject(e.target.value); setOfficialTopic(""); }} className="input max-w-[220px]" allOption />
+        {subject !== "ALL" && topicsForSubject(subject).length > 0 && (
+          <select value={officialTopic} onChange={(e) => setOfficialTopic(e.target.value)} className="input max-w-[200px]">
+            <option value="">All topics</option>
+            {topicsForSubject(subject).map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
+        )}
         <select data-testid={TID.repoFilterMode} value={filterMode} onChange={(e) => setFilterMode(e.target.value)} className="input max-w-[180px]">
           {FILTER_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </select>

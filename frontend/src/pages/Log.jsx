@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Plus, Trash2, Clock, ChevronDown, CheckCircle, X as XIcon, FileText, Upload, Eye, FileQuestion } from "lucide-react";
 import { logsApi, subjectCompletionApi, resourceUrl } from "@/lib/api";
 import { SUBJECTS, SUBJECT_LABELS, ACTIVITIES, TID } from "@/lib/constants";
+import { topicsForSubject, matchTopic } from "@/lib/gateSyllabus";
 import { todayISO, fmtDate, fmtDuration, isoAdd } from "@/lib/dateUtils";
 import Modal from "@/components/Modal";
 import HelpButton from "@/components/HelpButton";
@@ -12,7 +13,7 @@ import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
 const emptyForm = {
-  date: todayISO(), activity: "Practice", subject: "OS", topic: "",
+  date: todayISO(), activity: "Practice", subject: "OS", topic: "", official_topic: "",
   duration_min: 30, questions_attempted: 0, questions_correct: 0, questions_wrong: 0, remarks: "",
 };
 
@@ -136,7 +137,9 @@ export default function Log() {
   }, []);
 
   const submit = async () => {
-    await logsApi.create({ ...form, duration_min: Number(form.duration_min) });
+    const payload = { ...form, duration_min: Number(form.duration_min) };
+    payload.official_topic = form.official_topic || matchTopic(form.subject, form.topic) || "";
+    await logsApi.create(payload);
     setOpen(false);
     setForm(emptyForm);
     load();
@@ -417,6 +420,15 @@ export default function Log() {
             <div><label className="label-x">Subject</label><SubjectSelect data-testid={TID.logFormSubject} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="input mt-1" /></div>
           </div>
           <div><label className="label-x">Topic</label><input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} className="input mt-1" placeholder="e.g. Trees" /></div>
+          {topicsForSubject(form.subject).length > 0 && (
+            <div>
+              <label className="label-x">Syllabus Topic</label>
+              <select value={form.official_topic} onChange={(e) => setForm({ ...form, official_topic: e.target.value })} className="input mt-1">
+                <option value="">— None / Other —</option>
+                {topicsForSubject(form.subject).map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+              </select>
+            </div>
+          )}
           {form.activity === "Practice" && (
             <div className="grid grid-cols-3 gap-3">
               <div><label className="label-x">Attempted</label><input type="number" value={form.questions_attempted} onChange={(e) => setForm({ ...form, questions_attempted: Number(e.target.value) })} className="input mt-1" /></div>

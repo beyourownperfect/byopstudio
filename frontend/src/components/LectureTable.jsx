@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { Plus, Trash2, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, BookOpen, X } from "lucide-react";
 import { lecturesApi } from "@/lib/api";
 import { SUBJECTS } from "@/lib/constants";
-import { topicsForSubject } from "@/lib/gateSyllabus";
+import { topicsForSubject, topicLabel } from "@/lib/gateSyllabus";
 
 const SORT_KEYS = {
   subject: (a, b) => (a.subject || "").localeCompare(b.subject || ""),
@@ -10,7 +10,7 @@ const SORT_KEYS = {
   lecture_number: (a, b) => (a.lecture_number || "").localeCompare(b.lecture_number || ""),
 };
 
-const GRID_COLS = "grid-cols-[100px_1fr_70px_1fr_70px_70px_90px_54px_54px_40px]";
+const GRID_COLS = "grid-cols-[100px_1fr_70px_1fr_70px_70px_90px_54px_54px_100px_40px]";
 
 function sortItems(items, sortBy) {
   if (!sortBy) return items;
@@ -30,6 +30,7 @@ export default function LectureTable() {
   const [collapsed, setCollapsed] = useState({});
   const [addOpen, setAddOpen] = useState(false);
   const [newSubject, setNewSubject] = useState("");
+  const [newOfficialTopic, setNewOfficialTopic] = useState("");
 
   const load = useCallback(async () => {
     const params = {};
@@ -108,12 +109,13 @@ export default function LectureTable() {
 
   const openAdd = () => {
     setNewSubject("");
+    setNewOfficialTopic("");
     setAddOpen(true);
   };
 
   const addLecture = async () => {
     if (!newSubject) return;
-    await lecturesApi.create({ subject: newSubject, topic: "", lecture_name: "", lecture_number: "", duration_min: 0, total_duration_min: 0, completion_percent: 0, notes_done: false, revision_done: false });
+    await lecturesApi.create({ subject: newSubject, topic: "", official_topic: newOfficialTopic, lecture_name: "", lecture_number: "", duration_min: 0, total_duration_min: 0, completion_percent: 0, notes_done: false, revision_done: false });
     setAddOpen(false);
     load();
   };
@@ -202,6 +204,19 @@ export default function LectureTable() {
       );
     }
 
+    if (field === "official_topic") {
+      const ot = lec.official_topic;
+      return (
+        <span
+          className="text-[11px] text-[hsl(var(--fg-muted))] cursor-pointer hover:text-[hsl(var(--accent))] transition-colors truncate max-w-[100px] block"
+          onClick={() => startEdit(lec.id, field, ot)}
+          title={ot ? topicLabel(ot) : "Click to set syllabus topic"}
+        >
+          {ot ? topicLabel(ot) : <span className="text-[hsl(var(--fg-subtle))]">—</span>}
+        </span>
+      );
+    }
+
     const val = lec[field] ?? "";
     const display = field === "subject"
       ? <span className="text-[11px] font-semibold text-[hsl(var(--accent))]">{val}</span>
@@ -263,10 +278,19 @@ export default function LectureTable() {
             </button>
             <h3 className="font-semibold text-sm mb-4">Add Lecture</h3>
             <label className="label-x mb-1">Subject *</label>
-            <select value={newSubject} onChange={(e) => setNewSubject(e.target.value)} className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-2 py-1.5 text-sm w-full outline-none focus:border-[hsl(var(--accent))] mb-4">
+            <select value={newSubject} onChange={(e) => { setNewSubject(e.target.value); setNewOfficialTopic(""); }} className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-2 py-1.5 text-sm w-full outline-none focus:border-[hsl(var(--accent))] mb-3">
               <option value="">Select subject…</option>
               {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
+            {newSubject && topicsForSubject(newSubject).length > 0 && (
+              <>
+                <label className="label-x mb-1">Syllabus Topic</label>
+                <select value={newOfficialTopic} onChange={(e) => setNewOfficialTopic(e.target.value)} className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-2 py-1.5 text-sm w-full outline-none focus:border-[hsl(var(--accent))] mb-4">
+                  <option value="">— None / Other —</option>
+                  {topicsForSubject(newSubject).map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                </select>
+              </>
+            )}
             <button onClick={addLecture} disabled={!newSubject} className="btn btn-primary w-full text-sm" title={!newSubject ? "Select a subject first" : ""}>
               <Plus className="w-3.5 h-3.5" /> Add Lecture
             </button>
@@ -287,6 +311,7 @@ export default function LectureTable() {
             <span className="text-right">Completion</span>
             <span className="text-center">Notes</span>
             <span className="text-center">Rev</span>
+            <span>Topic</span>
             <span />
           </div>
 
@@ -319,6 +344,7 @@ export default function LectureTable() {
                     <span className="text-center text-[hsl(var(--fg-muted))]">{lectures.filter((l) => l.notes_done).length}</span>
                     <span className="text-center text-[hsl(var(--fg-muted))]">{lectures.filter((l) => l.revision_done).length}</span>
                     <span />
+                    <span />
                   </button>
 
                   {!isCollapsed && lectures.map((lec) => (
@@ -349,6 +375,7 @@ export default function LectureTable() {
                           className="accent-[hsl(var(--accent))] cursor-pointer"
                         />
                       </div>
+                      {renderCell(lec, "official_topic")}
                       <div className="flex justify-end">
                         <button onClick={() => handleDelete(lec.id)} className="btn-ghost p-1 text-[hsl(var(--danger))]/70 hover:text-[hsl(var(--danger))]">
                           <Trash2 className="w-3 h-3" />

@@ -20,6 +20,7 @@ import uuid
 from datetime import datetime, timezone, date, timedelta
 
 ROOT_DIR = Path(__file__).parent
+sys.path.insert(0, str(ROOT_DIR))
 load_dotenv(ROOT_DIR / ".env")
 
 mongo_url = os.environ.get("MONGO_URL")
@@ -41,7 +42,18 @@ else:
 app = FastAPI(title="BYOPGateCS.studio API")
 api_router = APIRouter(prefix="/api")
 
-SUBJECTS = ["C", "DS", "AL", "OS", "DB", "COA", "TOC", "CD", "DL", "EM", "DM", "CN"]
+from syllabus import (
+    GATE_SYLLABUS,
+    SUBJECTS,
+    SUBJECT_LABELS,
+    REAL_SUBJECTS,
+    ALL_TOPICS,
+    syllabus_topic_label,
+    syllabus_title,
+    match_topic,
+    resolve_topic,
+)
+
 ACTIVITIES = ["Lecture", "Practice", "Revision", "Mock Test", "Reading"]
 SRS_INTERVALS = [1, 3, 7, 14, 30, 90]  # days
 REVISIT_TYPES = [
@@ -55,22 +67,6 @@ REVISIT_TYPES = [
     "weak_topic",
     "repository_item",
 ]
-
-# Official GATE CSE Syllabus — canonical topic hierarchy per subject.
-# Key = subject code, topics[key] = human-readable label.
-# "OTHER" is a fallback for user-created free-text topics not in the syllabus.
-GATE_SYLLABUS = {
-    "EM": {"Discrete Mathematics": "discrete_mathematics", "Linear Algebra": "linear_algebra", "Calculus": "calculus", "Probability & Statistics": "probability_statistics"},
-    "DL": {"Boolean Algebra": "boolean_algebra", "Combinational Circuits": "combinational_circuits", "Sequential Circuits": "sequential_circuits", "Logic Minimization": "logic_minimization", "Number Representation": "number_representation", "Fixed/Floating Point": "fixed_floating_point"},
-    "COA": {"Machine Instructions": "machine_instructions", "Addressing Modes": "addressing_modes", "ALU": "alu", "Datapath & Control": "datapath_control", "Pipeline": "pipeline", "Memory Hierarchy": "memory_hierarchy", "Cache": "cache", "Virtual Memory": "virtual_memory", "I/O": "io", "Interrupts": "interrupts", "DMA": "dma"},
-    "C": {"C Programming": "c_programming", "Recursion": "recursion", "Arrays": "arrays", "Linked Lists": "linked_lists", "Stacks": "stacks", "Queues": "queues", "Trees": "trees", "BST": "bst", "Heaps": "heaps", "Graphs": "graphs"},
-    "AL": {"Asymptotic Analysis": "asymptotic_analysis", "Searching": "searching", "Sorting": "sorting", "Hashing": "hashing", "Divide & Conquer": "divide_conquer", "Greedy": "greedy", "Dynamic Programming": "dynamic_programming", "Graph Algorithms": "graph_algorithms", "Minimum Spanning Tree": "mst", "Shortest Paths": "shortest_paths"},
-    "TOC": {"Regular Languages": "regular_languages", "Finite Automata": "finite_automata", "Regular Expressions": "regular_expressions", "Context-Free Grammars": "cfg", "Pushdown Automata": "pushdown_automata", "Pumping Lemma": "pumping_lemma", "Turing Machines": "turing_machines", "Undecidability": "undecidability"},
-    "CD": {"Lexical Analysis": "lexical_analysis", "Parsing": "parsing", "Syntax Directed Translation": "syntax_directed_translation", "Runtime Environment": "runtime_environment", "Intermediate Code": "intermediate_code", "Code Optimization": "code_optimization"},
-    "OS": {"Processes": "processes", "Threads": "threads", "Concurrency": "concurrency", "Synchronization": "synchronization", "Deadlocks": "deadlocks", "CPU Scheduling": "cpu_scheduling", "Memory Management": "memory_management", "Virtual Memory": "virtual_memory_os", "File Systems": "file_systems", "I/O Systems": "io_systems"},
-    "DB": {"ER Model": "er_model", "Relational Model": "relational_model", "Relational Algebra": "relational_algebra", "SQL": "sql", "Integrity Constraints": "integrity_constraints", "Normalization": "normalization", "File Organization": "file_organization", "Indexing": "indexing", "Transactions": "transactions", "Concurrency Control": "concurrency_control"},
-    "CN": {"OSI/TCP-IP": "osi_tcp_ip", "Physical Layer": "physical_layer", "Data Link Layer": "data_link_layer", "MAC": "mac", "Ethernet": "ethernet", "Routing": "routing", "IPv4": "ipv4", "ARP": "arp", "ICMP": "icmp", "DHCP": "dhcp", "TCP": "tcp", "UDP": "udp", "Congestion Control": "congestion_control", "DNS": "dns", "HTTP": "http", "FTP": "ftp", "SMTP": "smtp"},
-}
 
 
 def now_iso() -> str:
@@ -250,6 +246,7 @@ class StudyLog(BaseModel):
     activity: str
     subject: str
     topic: str = ""
+    official_topic: str = ""
     duration_min: int = 0
     questions_attempted: int = 0
     questions_correct: int = 0
@@ -264,6 +261,7 @@ class TimelineEntry(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     subject: str
     topic: str = ""
+    official_topic: str = ""
     activity: str  # Lecture, Practice, Revision, Mock Test, Reading
     title: str
     duration_min: int = 0
@@ -369,10 +367,15 @@ async def root():
 @api_router.get("/meta")
 async def meta():
     topic_map = {}
-    for subj, topics in GATE_SYLLABUS.items():
-        topic_map[subj] = [{k: v} for v, k in topics.items()]
+    for subj_code, subj_data in GATE_SYLLABUS.items():
+        if subj_code == "DS":
+            continue
+        topic_map[subj_code] = [
+            {tk: td["label"]} for tk, td in subj_data.get("topics", {}).items()
+        ]
     return {
         "subjects": SUBJECTS,
+        "subject_labels": SUBJECT_LABELS,
         "activities": ACTIVITIES,
         "srs_intervals": SRS_INTERVALS,
         "syllabus": topic_map,
@@ -408,6 +411,7 @@ async def create_question(payload: QuestionCreate):
 async def list_questions(
     subject: Optional[str] = None,
     topic: Optional[str] = None,
+    official_topic: Optional[str] = None,
     question_type: Optional[str] = None,
     difficulty: Optional[str] = None,
     bookmarked: Optional[bool] = None,
@@ -423,6 +427,8 @@ async def list_questions(
         query["subject"] = subject
     if topic:
         query["topic"] = {"$regex": topic, "$options": "i"}
+    if official_topic:
+        query["official_topic"] = official_topic
     if question_type:
         query["question_type"] = question_type
     if difficulty:
@@ -620,6 +626,7 @@ async def bulk_create_questions(payload: Dict[str, List[Dict[str, Any]]]):
 async def next_question(
     mode: str = "due",  # due, wrong, bookmarked, weak, new, all, subject
     subject: Optional[str] = None,
+    official_topic: Optional[str] = None,
     exclude_ids: Optional[str] = None,
 ):
     today = today_iso()
@@ -627,6 +634,8 @@ async def next_question(
     query: Dict[str, Any] = {}
     if subject and subject != "ALL":
         query["subject"] = subject
+    if official_topic:
+        query["official_topic"] = official_topic
 
     candidates: List[dict] = []
     if mode == "due":
@@ -743,6 +752,7 @@ async def submit_practice(payload: Dict[str, Any]):
     await db.srs.update_one({"question_id": qid}, {"$set": update}, upsert=True)
 
     # auto-log: aggregate practice into today's practice log for this subject
+    q_official_topic = q.get("official_topic", "")
     log_filter = {
         "date": today_iso(),
         "activity": "Practice",
@@ -767,6 +777,7 @@ async def submit_practice(payload: Dict[str, Any]):
             activity="Practice",
             subject=q["subject"],
             topic=q.get("topic", ""),
+            official_topic=q_official_topic,
             duration_min=max(1, time_taken // 60),
             questions_attempted=1,
             questions_correct=1 if correct else 0,
@@ -796,9 +807,10 @@ async def submit_practice(payload: Dict[str, Any]):
     else:
         tl = TimelineEntry(
             subject=q["subject"],
-            topic="",
+            topic=q.get("topic", ""),
+            official_topic=q_official_topic,
             activity="Practice",
-            title=f"Practice — {q['subject']}",
+            title=syllabus_title(q["subject"], q_official_topic, "Practice"),
             duration_min=max(1, time_taken // 60),
             questions_solved=1,
             date=tl_date,
@@ -849,11 +861,13 @@ async def create_log(payload: Dict[str, Any]):
     # Auto-bridge to timeline: every orphan log (no timeline_entry_id) creates
     # a matching timeline entry so study activity renders on the calendar.
     if not log.timeline_entry_id:
+        log_ot = log.official_topic or resolve_topic(log.subject, "", log.topic)
         tl = TimelineEntry(
             subject=log.subject,
             topic=log.topic,
+            official_topic=log_ot,
             activity=log.activity,
-            title=log.remarks or f"{log.activity} — {log.subject}",
+            title=log.remarks or syllabus_title(log.subject, log_ot, log.activity),
             duration_min=log.duration_min,
             questions_solved=log.questions_attempted,
             notes=log.remarks,
@@ -1168,23 +1182,25 @@ async def _compute_topic_readiness() -> list:
     """Per-subject topic-level readiness: questions, lectures, PYQs, completion %, mastery.
     Highlights empty topics so users see what's untouched."""
     result = []
-    for subj in SUBJECTS:
-        topics = GATE_SYLLABUS.get(subj, {})
+    for subj in REAL_SUBJECTS:
+        subj_data = GATE_SYLLABUS.get(subj, {})
+        topics = subj_data.get("topics", {})
         if not topics:
             continue
         topic_rows = []
-        for label, key in topics.items():
-            q_count = await db.questions.count_documents({"subject": subj, "official_topic": key})
-            lec_count = await db.lectures.count_documents({"subject": subj, "official_topic": key})
-            pyq_count = await db.questions.count_documents({"subject": subj, "official_topic": key, "year": {"$ne": None}})
-            qids = [q["id"] async for q in db.questions.find({"subject": subj, "official_topic": key}, {"_id": 0, "id": 1})]
+        for topic_key, topic_data in topics.items():
+            label = topic_data["label"]
+            q_count = await db.questions.count_documents({"subject": subj, "official_topic": topic_key})
+            lec_count = await db.lectures.count_documents({"subject": subj, "official_topic": topic_key})
+            pyq_count = await db.questions.count_documents({"subject": subj, "official_topic": topic_key, "year": {"$ne": None}})
+            qids = [q["id"] async for q in db.questions.find({"subject": subj, "official_topic": topic_key}, {"_id": 0, "id": 1})]
             srs_docs = await db.srs.find({"question_id": {"$in": qids}}, {"_id": 0}).to_list(5000) if qids else []
             mastery_vals = [_compute_mastery(s) for s in srs_docs if s.get("total_attempts", 0) > 0]
             mastery_avg = round(sum(mastery_vals) / len(mastery_vals), 1) if mastery_vals else 0
             completed = sum(1 for s in srs_docs if _is_question_completed(s))
             percent = round(completed / q_count * 100, 1) if q_count else 0
             topic_rows.append({
-                "key": key, "label": label,
+                "key": topic_key, "label": label,
                 "questions": q_count, "lectures": lec_count, "pyqs": pyq_count,
                 "completed": completed, "percent": percent, "mastery": mastery_avg,
                 "has_lectures": lec_count > 0, "has_questions": q_count > 0, "has_pyqs": pyq_count > 0,
@@ -1307,8 +1323,9 @@ async def pulse():
     today_minutes = sum(log.get("duration_min", 0) for log in today_logs)
 
     # ----- Weakness Engine -----
-    # Group last-30-day attempts by (subject, topic). A bucket is "weak" if it has
+    # Group last-30-day attempts by (subject, official_topic). A bucket is "weak" if it has
     # at least 3 attempts AND accuracy < 70%. Top 3 weakest are surfaced.
+    # Uses official_topic first; falls back to free-text topic via fuzzy matching.
     cutoff = (date.today() - timedelta(days=30)).isoformat()
     recent_attempts = await db.attempts.find(
         {"created_at": {"$gte": cutoff}}, {"_id": 0}
@@ -1322,12 +1339,15 @@ async def pulse():
             q = qmap.get(a["question_id"])
             if not q:
                 continue
-            key = f"{q['subject']}::{q.get('topic','') or 'General'}"
+            resolved_topic = resolve_topic(q["subject"], q.get("official_topic", ""), q.get("topic", ""))
+            topic_display = resolved_topic or q.get("topic", "") or "General"
+            key = f"{q['subject']}::{resolved_topic or 'general'}"
             d = agg.setdefault(
                 key,
                 {
                     "subject": q["subject"],
-                    "topic": q.get("topic", "") or "General",
+                    "topic": topic_display,
+                    "official_topic": resolved_topic,
                     "total": 0,
                     "correct": 0,
                 },
@@ -2091,11 +2111,18 @@ async def upsert_subject_completion(payload: Dict[str, Any]):
         raise HTTPException(400, f"Invalid subject. Use one of {SUBJECTS}")
     subject = payload["subject"]
     topic = payload.get("topic", "")
+    official_topic = payload.get("official_topic", "") or resolve_topic(subject, "", topic)
     update = {k: v for k, v in payload.items() if k in SubjectCompletion.model_fields}
     update["updated_at"] = now_iso()
-    existing = await db.subject_completion.find_one(
-        {"subject": subject, "topic": topic}, {"_id": 0}
-    )
+    # Use official_topic as primary identity; fall back to free-text topic
+    if official_topic:
+        existing = await db.subject_completion.find_one(
+            {"subject": subject, "official_topic": official_topic}, {"_id": 0}
+        )
+    else:
+        existing = await db.subject_completion.find_one(
+            {"subject": subject, "topic": topic}, {"_id": 0}
+        )
     if existing:
         await db.subject_completion.update_one(
             {"id": existing["id"]}, {"$set": update}
