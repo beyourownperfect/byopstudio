@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, AlertTriangle, BookOpen, Target, RotateCcw, FileText, Settings as SettingsIcon, ChevronDown, ArrowRight, TrendingUp, TrendingDown, CheckCircle, Circle } from "lucide-react";
+import { Zap, AlertTriangle, BookOpen, Target, RotateCcw, FileText, Settings as SettingsIcon, ChevronDown, ArrowRight, TrendingUp, TrendingDown, CheckCircle, Circle, BarChart3, ChevronUp } from "lucide-react";
 import { pulseApi, settingsApi } from "@/lib/api";
 import { SUBJECT_LABELS, TID } from "@/lib/constants";
 import { fmtDateLong } from "@/lib/dateUtils";
+import { topicLabel } from "@/lib/gateSyllabus";
 import HelpButton from "@/components/HelpButton";
 import MissionCard from "@/components/MissionCard";
 import StudyTimer from "@/components/StudyTimer";
@@ -130,6 +131,7 @@ export default function Pulse() {
         <PreparationSnapshot snapshot={data.preparation_snapshot} />
         <WeakTopicsCard weakTopics={data.weak_topics} expanded={weakExpanded} toggle={() => setWeakExpanded(!weakExpanded)} navigate={navigate} />
         <SubjectCompletionCard subjects={sortedSubjects} />
+        <TopicReadinessCard topicReadiness={data.topic_readiness} navigate={navigate} />
       </div>
 
       {/* Settings modal */}
@@ -163,6 +165,75 @@ export default function Pulse() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function TopicReadinessCard({ topicReadiness, navigate }) {
+  const [expandedSubjects, setExpandedSubjects] = useState({});
+
+  if (!topicReadiness || topicReadiness.length === 0) return null;
+
+  const toggleSubject = (subj) => setExpandedSubjects((e) => ({ ...e, [subj]: !e[subj] }));
+
+  const totalEmpty = topicReadiness.reduce((sum, s) => sum + s.topics.filter((t) => !t.has_questions && !t.has_lectures).length, 0);
+
+  return (
+    <div className="card-2 overflow-hidden">
+      <div className="flex items-center gap-2 px-5 py-4">
+        <BarChart3 className="w-4 h-4 text-[hsl(var(--info))]" />
+        <h3 className="font-semibold text-sm">Topic Readiness</h3>
+        {totalEmpty > 0 && <span className="chip chip-warning text-[10px]">{totalEmpty} untouched</span>}
+      </div>
+      <div className="border-t border-border px-5 pb-4 space-y-1">
+        {topicReadiness.map(({ subject, topics }) => {
+          const isExpanded = expandedSubjects[subject] ?? false;
+          const done = topics.filter((t) => t.has_questions || t.has_lectures).length;
+          const mastered = topics.filter((t) => t.percent >= 80).length;
+
+          return (
+            <div key={subject}>
+              <button
+                onClick={() => toggleSubject(subject)}
+                className="w-full flex items-center gap-2 py-2 text-left hover:bg-[hsl(var(--bg-elev))]/40 rounded px-2 transition-colors"
+              >
+                <ChevronDown className={`w-3 h-3 text-[hsl(var(--fg-subtle))] transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
+                <span className="text-xs font-semibold w-8">{subject}</span>
+                <span className="text-[11px] text-[hsl(var(--fg-muted))] flex-1 truncate">{SUBJECT_LABELS[subject]}</span>
+                <span className="text-[10px] mono text-[hsl(var(--fg-subtle))]">{done}/{topics.length} · {mastered} mastered</span>
+              </button>
+              {isExpanded && (
+                <div className="ml-10 space-y-0.5 pb-1">
+                  {topics.map((t) => {
+                    const isEmpty = !t.has_questions && !t.has_lectures;
+                    const barColor = t.percent >= 80 ? "bg-[hsl(var(--success))]" : t.percent >= 40 ? "bg-[hsl(var(--warning))]" : isEmpty ? "bg-[hsl(var(--bg-elev-2))]" : "bg-[hsl(var(--danger))]";
+                    return (
+                      <button
+                        key={t.key}
+                        onClick={() => navigate(`/solve/practice?subject=${subject}`)}
+                        className="w-full flex items-center gap-2 py-1 px-2 rounded hover:bg-[hsl(var(--bg-elev))]/40 transition-colors group"
+                      >
+                        <div className={`w-1.5 h-1.5 rounded-full ${isEmpty ? "bg-[hsl(var(--fg-subtle))]/30" : t.has_questions ? "bg-[hsl(var(--accent))]" : "bg-[hsl(var(--info))]"}`} />
+                        <span className={`text-[11px] flex-1 truncate ${isEmpty ? "text-[hsl(var(--fg-subtle))]/50" : "text-[hsl(var(--fg-muted))]"}`}>{t.label}</span>
+                        {!isEmpty && (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[9px] mono text-[hsl(var(--fg-subtle))]">{t.questions}Q · {t.pyqs}PYQ</span>
+                            <div className="w-10 h-1 bg-[hsl(var(--bg-elev-2))] rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${t.percent}%` }} />
+                            </div>
+                          </div>
+                        )}
+                        {isEmpty && <span className="text-[9px] text-[hsl(var(--fg-subtle))]/40 italic">untouched</span>}
+                        <ArrowRight className="w-2.5 h-2.5 text-[hsl(var(--accent))] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

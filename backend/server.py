@@ -56,6 +56,22 @@ REVISIT_TYPES = [
     "repository_item",
 ]
 
+# Official GATE CSE Syllabus — canonical topic hierarchy per subject.
+# Key = subject code, topics[key] = human-readable label.
+# "OTHER" is a fallback for user-created free-text topics not in the syllabus.
+GATE_SYLLABUS = {
+    "EM": {"Discrete Mathematics": "discrete_mathematics", "Linear Algebra": "linear_algebra", "Calculus": "calculus", "Probability & Statistics": "probability_statistics"},
+    "DL": {"Boolean Algebra": "boolean_algebra", "Combinational Circuits": "combinational_circuits", "Sequential Circuits": "sequential_circuits", "Logic Minimization": "logic_minimization", "Number Representation": "number_representation", "Fixed/Floating Point": "fixed_floating_point"},
+    "COA": {"Machine Instructions": "machine_instructions", "Addressing Modes": "addressing_modes", "ALU": "alu", "Datapath & Control": "datapath_control", "Pipeline": "pipeline", "Memory Hierarchy": "memory_hierarchy", "Cache": "cache", "Virtual Memory": "virtual_memory", "I/O": "io", "Interrupts": "interrupts", "DMA": "dma"},
+    "C": {"C Programming": "c_programming", "Recursion": "recursion", "Arrays": "arrays", "Linked Lists": "linked_lists", "Stacks": "stacks", "Queues": "queues", "Trees": "trees", "BST": "bst", "Heaps": "heaps", "Graphs": "graphs"},
+    "AL": {"Asymptotic Analysis": "asymptotic_analysis", "Searching": "searching", "Sorting": "sorting", "Hashing": "hashing", "Divide & Conquer": "divide_conquer", "Greedy": "greedy", "Dynamic Programming": "dynamic_programming", "Graph Algorithms": "graph_algorithms", "Minimum Spanning Tree": "mst", "Shortest Paths": "shortest_paths"},
+    "TOC": {"Regular Languages": "regular_languages", "Finite Automata": "finite_automata", "Regular Expressions": "regular_expressions", "Context-Free Grammars": "cfg", "Pushdown Automata": "pushdown_automata", "Pumping Lemma": "pumping_lemma", "Turing Machines": "turing_machines", "Undecidability": "undecidability"},
+    "CD": {"Lexical Analysis": "lexical_analysis", "Parsing": "parsing", "Syntax Directed Translation": "syntax_directed_translation", "Runtime Environment": "runtime_environment", "Intermediate Code": "intermediate_code", "Code Optimization": "code_optimization"},
+    "OS": {"Processes": "processes", "Threads": "threads", "Concurrency": "concurrency", "Synchronization": "synchronization", "Deadlocks": "deadlocks", "CPU Scheduling": "cpu_scheduling", "Memory Management": "memory_management", "Virtual Memory": "virtual_memory_os", "File Systems": "file_systems", "I/O Systems": "io_systems"},
+    "DB": {"ER Model": "er_model", "Relational Model": "relational_model", "Relational Algebra": "relational_algebra", "SQL": "sql", "Integrity Constraints": "integrity_constraints", "Normalization": "normalization", "File Organization": "file_organization", "Indexing": "indexing", "Transactions": "transactions", "Concurrency Control": "concurrency_control"},
+    "CN": {"OSI/TCP-IP": "osi_tcp_ip", "Physical Layer": "physical_layer", "Data Link Layer": "data_link_layer", "MAC": "mac", "Ethernet": "ethernet", "Routing": "routing", "IPv4": "ipv4", "ARP": "arp", "ICMP": "icmp", "DHCP": "dhcp", "TCP": "tcp", "UDP": "udp", "Congestion Control": "congestion_control", "DNS": "dns", "HTTP": "http", "FTP": "ftp", "SMTP": "smtp"},
+}
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -107,6 +123,7 @@ class Lecture(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     subject: str
     topic: str = ""
+    official_topic: str = ""
     lecture_name: str = ""
     lecture_number: str = ""
     duration_min: int = 0
@@ -122,6 +139,7 @@ class SubjectCompletion(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     subject: str
     topic: str = ""
+    official_topic: str = ""
     lectures_completed: bool = False
     notes_created: bool = False
     flashcards_created: bool = False
@@ -151,6 +169,7 @@ class Question(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     subject: str
     topic: str = ""
+    official_topic: str = ""  # syllabus topic key, e.g., "dynamic_programming"
     question_type: Literal["MCQ", "MSQ", "NAT"] = "MCQ"
     statement: str
     options: List[str] = Field(default_factory=list)
@@ -172,6 +191,7 @@ class Question(BaseModel):
 class QuestionCreate(BaseModel):
     subject: str
     topic: str = ""
+    official_topic: str = ""
     question_type: Literal["MCQ", "MSQ", "NAT"] = "MCQ"
     statement: str
     options: List[str] = Field(default_factory=list)
@@ -189,6 +209,7 @@ class QuestionCreate(BaseModel):
 class QuestionUpdate(BaseModel):
     subject: Optional[str] = None
     topic: Optional[str] = None
+    official_topic: Optional[str] = None
     question_type: Optional[str] = None
     statement: Optional[str] = None
     options: Optional[List[str]] = None
@@ -347,10 +368,14 @@ async def root():
 
 @api_router.get("/meta")
 async def meta():
+    topic_map = {}
+    for subj, topics in GATE_SYLLABUS.items():
+        topic_map[subj] = [{k: v} for v, k in topics.items()]
     return {
         "subjects": SUBJECTS,
         "activities": ACTIVITIES,
         "srs_intervals": SRS_INTERVALS,
+        "syllabus": topic_map,
     }
 
 
@@ -1139,6 +1164,35 @@ async def delete_revisit(rid: str):
     return {"success": True}
 
 
+async def _compute_topic_readiness() -> list:
+    """Per-subject topic-level readiness: questions, lectures, PYQs, completion %, mastery.
+    Highlights empty topics so users see what's untouched."""
+    result = []
+    for subj in SUBJECTS:
+        topics = GATE_SYLLABUS.get(subj, {})
+        if not topics:
+            continue
+        topic_rows = []
+        for label, key in topics.items():
+            q_count = await db.questions.count_documents({"subject": subj, "official_topic": key})
+            lec_count = await db.lectures.count_documents({"subject": subj, "official_topic": key})
+            pyq_count = await db.questions.count_documents({"subject": subj, "official_topic": key, "year": {"$ne": None}})
+            qids = [q["id"] async for q in db.questions.find({"subject": subj, "official_topic": key}, {"_id": 0, "id": 1})]
+            srs_docs = await db.srs.find({"question_id": {"$in": qids}}, {"_id": 0}).to_list(5000) if qids else []
+            mastery_vals = [_compute_mastery(s) for s in srs_docs if s.get("total_attempts", 0) > 0]
+            mastery_avg = round(sum(mastery_vals) / len(mastery_vals), 1) if mastery_vals else 0
+            completed = sum(1 for s in srs_docs if _is_question_completed(s))
+            percent = round(completed / q_count * 100, 1) if q_count else 0
+            topic_rows.append({
+                "key": key, "label": label,
+                "questions": q_count, "lectures": lec_count, "pyqs": pyq_count,
+                "completed": completed, "percent": percent, "mastery": mastery_avg,
+                "has_lectures": lec_count > 0, "has_questions": q_count > 0, "has_pyqs": pyq_count > 0,
+            })
+        result.append({"subject": subj, "topics": topic_rows})
+    return result
+
+
 # ============================ CALENDAR / PULSE =====================
 async def _aggregate_day(d_iso: str) -> dict:
     logs = await db.study_logs.find({"date": d_iso}, {"_id": 0}).to_list(1000)
@@ -1482,6 +1536,7 @@ async def pulse():
         "overall_completion_percent": overall_completion_percent,
         "overall_completed": overall_completed,
         "overall_total": overall_total,
+        "topic_readiness": _compute_topic_readiness(),
         "pyq_percent": pyq_percent,
         "pyq_done": pyq_done,
         "pyq_total": pyq_total,

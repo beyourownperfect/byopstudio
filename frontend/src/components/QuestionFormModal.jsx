@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Wand2 } from "lucide-react";
 import Modal from "@/components/Modal";
 import { SUBJECTS, QUESTION_TYPES, DIFFICULTIES, EXAM_SOURCES, TID } from "@/lib/constants";
 import { questionsApi } from "@/lib/api";
 import usePasteMarkdown from "@/lib/usePasteMarkdown";
+import { topicsForSubject } from "@/lib/gateSyllabus";
 
 const empty = {
-  subject: "OS", topic: "", question_type: "MCQ", statement: "",
+  subject: "OS", topic: "", official_topic: "", question_type: "MCQ", statement: "",
   options: ["", "", "", ""], correct_answer: "", explanation: "",
   gateoverflow_url: "", exam_source: "GATE", exam_source_other: "", year: "", difficulty: "Medium", bookmarked: false, notes: "",
 };
@@ -275,7 +276,20 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label-x">Topic</label>
-            <input data-testid={TID.qFormTopic} value={form.topic} onChange={(e) => set("topic", e.target.value)} className="input mt-1" placeholder="e.g. Process Synchronization" />
+            <input data-testid={TID.qFormTopic} value={form.topic} onChange={(e) => set("topic", e.target.value)} className="input mt-1" placeholder="Free-text or pick syllabus below" />
+          </div>
+          <div>
+            <label className="label-x">Syllabus Topic</label>
+            <select
+              value={form.official_topic}
+              onChange={(e) => set("official_topic", e.target.value)}
+              className="input mt-1"
+            >
+              <option value="">— None / Other —</option>
+              {topicsForSubject(form.subject).map((t) => (
+                <option key={t.key} value={t.key}>{t.label}</option>
+              ))}
+            </select>
           </div>
         </div>
         <div>
