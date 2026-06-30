@@ -177,4 +177,4 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for the full step-by-step guide.
 
 ---
 
-*Last updated: 2026-06-30 · v1.2*
+*Last updated: 2026-06-30 · v2.2*

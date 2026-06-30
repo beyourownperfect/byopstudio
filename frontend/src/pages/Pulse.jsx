@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, AlertTriangle, BookOpen, Target, RotateCcw, FileText, Settings as SettingsIcon, ChevronDown, ArrowRight, TrendingUp, TrendingDown, CheckCircle, Circle, BarChart3, ChevronUp } from "lucide-react";
+import { Zap, AlertTriangle, BookOpen, Target, RotateCcw, FileText, Settings as SettingsIcon, ChevronDown, ArrowRight, CheckCircle, Circle, BarChart3 } from "lucide-react";
 import { pulseApi, settingsApi } from "@/lib/api";
 import { SUBJECT_LABELS, TID } from "@/lib/constants";
 import { fmtDateLong } from "@/lib/dateUtils";
@@ -10,9 +10,6 @@ import MissionCard from "@/components/MissionCard";
 import StudyTimer from "@/components/StudyTimer";
 import QueueCard from "@/components/QueueCard";
 import { HELP_CONTENT } from "@/lib/helpContent";
-
-const MOMENTUM_COLORS = (n) =>
-  n >= 70 ? "text-[hsl(var(--success))]" : n >= 40 ? "text-[hsl(var(--warning))]" : "text-[hsl(var(--danger))]";
 
 const MASTERY_COLOR = (n) =>
   n >= 80 ? "bg-[hsl(var(--success))]" : n >= 40 ? "bg-[hsl(var(--warning))]" : "bg-[hsl(var(--danger))]";
@@ -115,31 +112,34 @@ export default function Pulse() {
         </div>
       )}
 
-      {/* ━━━ Today ━━━ */}
-      <SectionLabel icon={<Zap className="w-3.5 h-3.5" />} text="Today" />
-      <div className="space-y-4">
+      <DailySnapshot
+        todayQ={data.today_questions}
+        todayMin={data.today_minutes}
+        qTarget={data.targets.daily_question_target}
+        minTarget={data.targets.daily_study_minutes_target}
+        sparkline={data.momentum_sparkline}
+        delta={data.momentum_delta}
+        dueRevisions={data.due_revisions}
+        dueRevisits={data.due_revisits}
+        qPct={data.daily_q_percent}
+        minPct={data.daily_m_percent}
+      />
+
+      <div className="grid md:grid-cols-2 gap-4">
         <MissionCard initialItems={data.user_missions} />
         <QueueCard />
-        <div className="grid md:grid-cols-2 gap-4">
-          <MomentumCard momentum={data.momentum} delta={data.momentum_delta} sparkline={data.momentum_sparkline} />
-          <div className="card-2-time p-5">
-            <div className="label-x mb-1">Today&apos;s progress</div>
-            <div className="space-y-2 mt-1">
-              <ProgressLine label="Questions" value={data.today_questions} target={data.targets.daily_question_target} pct={data.daily_q_percent} />
-              <ProgressLine label="Minutes" value={data.today_minutes} target={data.targets.daily_study_minutes_target} pct={data.daily_m_percent} />
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* ━━━ Readiness ━━━ */}
-      <SectionLabel icon={<Target className="w-3.5 h-3.5" />} text="Readiness" />
-      <div className="space-y-4">
-        <PreparationSnapshot snapshot={data.preparation_snapshot} />
-        <WeakTopicsCard weakTopics={data.weak_topics} expanded={weakExpanded} toggle={() => setWeakExpanded(!weakExpanded)} navigate={navigate} />
-        <SubjectCompletionCard subjects={sortedSubjects} />
-        <TopicReadinessCard topicReadiness={topicReadiness} navigate={navigate} />
-      </div>
+      <SubjectReadiness
+        subjects={sortedSubjects}
+        snapshot={data.preparation_snapshot}
+        topicReadiness={topicReadiness}
+        overallCompleted={data.overall_completed}
+        overallTotal={data.overall_total}
+        navigate={navigate}
+      />
+
+      <WeakTopicsCard weakTopics={data.weak_topics} expanded={weakExpanded} toggle={() => setWeakExpanded(!weakExpanded)} navigate={navigate} />
 
       {/* Settings modal */}
       {showSettings && (
@@ -176,57 +176,85 @@ export default function Pulse() {
   );
 }
 
-function TopicReadinessCard({ topicReadiness, navigate }) {
+function SubjectReadiness({ subjects, snapshot, topicReadiness, overallCompleted, overallTotal, navigate }) {
   const [expandedSubjects, setExpandedSubjects] = useState({});
-
-  if (!topicReadiness || topicReadiness.length === 0) return null;
-
   const toggleSubject = (subj) => setExpandedSubjects((e) => ({ ...e, [subj]: !e[subj] }));
 
-  const totalEmpty = topicReadiness.reduce((sum, s) => sum + s.topics.filter((t) => !t.has_questions && !t.has_lectures).length, 0);
+  const metrics = snapshot ? [
+    { key: "subject_coverage", label: "Coverage", value: Math.round((overallCompleted / Math.max(1, overallTotal)) * 100), icon: BookOpen },
+    { key: "question_mastery", label: "Mastery", value: snapshot.question_mastery, icon: Target },
+    { key: "revision_completion", label: "Revision", value: snapshot.revision_completion, icon: RotateCcw },
+    { key: "mock_readiness", label: "Mock", value: snapshot.mock_tests_exist ? snapshot.mock_readiness : 0, icon: FileText, muted: !snapshot.mock_tests_exist },
+  ] : [];
+
+  const totalEmpty = topicReadiness ? topicReadiness.reduce((sum, s) => sum + s.topics.filter((t) => !t.has_questions && !t.has_lectures).length, 0) : 0;
 
   return (
     <div className="card-2 overflow-hidden">
-      <div className="flex items-center gap-2 px-5 py-4">
-        <BarChart3 className="w-4 h-4 text-[hsl(var(--info))]" />
-        <h3 className="font-semibold text-sm">Topic Readiness</h3>
-        {totalEmpty > 0 && <span className="chip chip-warning text-[10px]">{totalEmpty} untouched</span>}
-      </div>
-      <div className="border-t border-border px-5 pb-4 space-y-1">
-        {topicReadiness.map(({ subject, topics }) => {
-          const isExpanded = expandedSubjects[subject] ?? false;
-          const done = topics.filter((t) => t.has_questions || t.has_lectures).length;
-          const mastered = topics.filter((t) => t.percent >= 80).length;
+      {/* Readiness bars row */}
+      {metrics.length > 0 && (
+        <div className="px-5 py-4 border-b border-border">
+          <div className="grid grid-cols-4 gap-3">
+            {metrics.map((m) => {
+              const Icon = m.icon;
+              return (
+                <div key={m.key} className={m.muted ? "opacity-40" : ""} title={m.label}>
+                  <div className="flex items-center gap-1 mb-1">
+                    <Icon className="w-3 h-3 text-[hsl(var(--fg-subtle))] shrink-0" />
+                    <span className="text-[10px] text-[hsl(var(--fg-muted))]">{m.label}</span>
+                  </div>
+                  <div className="flex items-end gap-1">
+                    <span className="mono font-semibold text-sm">{m.value}%</span>
+                    <div className="flex-1 h-1 bg-[hsl(var(--bg-elev-2))] rounded-full overflow-hidden mb-0.5">
+                      <div className="h-full bg-[hsl(var(--accent))] rounded-full transition-all" style={{ width: `${m.value}%` }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
+      {/* Subject rows */}
+      <div className="px-5 py-3 space-y-0.5">
+        {subjects.map((s) => {
+          const isExpanded = expandedSubjects[s.subject] ?? false;
+          const topicData = topicReadiness?.find((t) => t.subject === s.subject);
           return (
-            <div key={subject}>
+            <div key={s.subject}>
               <button
-                onClick={() => toggleSubject(subject)}
-                className="w-full flex items-center gap-2 py-2 text-left hover:bg-[hsl(var(--bg-elev))]/40 rounded px-2 transition-colors"
+                onClick={() => topicData && toggleSubject(s.subject)}
+                className="w-full flex items-center gap-2 py-1.5 text-left hover:bg-[hsl(var(--bg-elev))]/40 rounded px-1.5 transition-colors"
               >
-                <ChevronDown className={`w-3 h-3 text-[hsl(var(--fg-subtle))] transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
-                <span className={`text-xs font-semibold w-8 ${subjectColor(subject).text}`}>{subject}</span>
-                <span className="text-[11px] text-[hsl(var(--fg-muted))] flex-1 truncate">{SUBJECT_LABELS[subject]}</span>
-                <span className="text-[10px] mono text-[hsl(var(--fg-subtle))]">{done}/{topics.length} · {mastered} mastered</span>
+                <span className={`text-[11px] font-semibold w-7 ${subjectColor(s.subject).text}`}>{s.subject}</span>
+                <span className="text-[11px] text-[hsl(var(--fg-muted))] flex-1 truncate">{SUBJECT_LABELS[s.subject]}</span>
+                <span className="text-[10px] mono text-[hsl(var(--fg-muted))] w-10 text-right shrink-0">{s.completed}/{s.total}</span>
+                <div className="w-14 h-1 bg-[hsl(var(--bg-elev-2))] rounded-full overflow-hidden shrink-0">
+                  <div className={`h-full rounded-full transition-all ${subjectColor(s.subject).bar}`} style={{ width: `${s.percent}%` }} />
+                </div>
+                {topicData && (
+                  <ChevronRight className={`w-3 h-3 text-[hsl(var(--fg-subtle))] transition-transform shrink-0 ${isExpanded ? "rotate-90" : ""}`} />
+                )}
               </button>
-              {isExpanded && (
+              {isExpanded && topicData && (
                 <div className="ml-10 space-y-0.5 pb-1">
-                  {topics.map((t) => {
+                  {topicData.topics.map((t) => {
                     const isEmpty = !t.has_questions && !t.has_lectures;
                     const barColor = t.percent >= 80 ? "bg-[hsl(var(--success))]" : t.percent >= 40 ? "bg-[hsl(var(--warning))]" : isEmpty ? "bg-[hsl(var(--bg-elev-2))]" : "bg-[hsl(var(--danger))]";
                     return (
                       <button
                         key={t.key}
-                        onClick={() => navigate(`/solve/practice?subject=${subject}&topic=${t.key}`)}
+                        onClick={() => navigate(`/solve/practice?subject=${s.subject}&topic=${t.key}`)}
                         className="w-full flex items-center gap-2 py-1 px-2 rounded hover:bg-[hsl(var(--bg-elev))]/40 transition-colors group"
                       >
-                        <div className={`w-1.5 h-1.5 rounded-full ${isEmpty ? "bg-[hsl(var(--fg-subtle))]/30" : t.has_questions ? "bg-[hsl(var(--accent))]" : "bg-[hsl(var(--info))]"}`} />
+                        <div className={`w-1 h-1 rounded-full ${isEmpty ? "bg-[hsl(var(--fg-subtle))]/30" : "bg-[hsl(var(--accent))]"}`} />
                         <span className={`text-[11px] flex-1 truncate ${isEmpty ? "text-[hsl(var(--fg-subtle))]/50" : "text-[hsl(var(--fg-muted))]"}`}>{t.label}</span>
                         {!isEmpty && (
                           <div className="flex items-center gap-1.5 shrink-0">
                             <span className="text-[9px] mono text-[hsl(var(--fg-subtle))]">{t.questions}Q · {t.pyqs}PYQ</span>
-                            <div className="w-10 h-1 bg-[hsl(var(--bg-elev-2))] rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${t.percent}%` }} />
+                            <div className="w-8 h-0.5 bg-[hsl(var(--bg-elev-2))] rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full ${barColor}`} style={{ width: `${t.percent}%` }} />
                             </div>
                           </div>
                         )}
@@ -241,19 +269,21 @@ function TopicReadinessCard({ topicReadiness, navigate }) {
           );
         })}
       </div>
+
+      {totalEmpty > 0 && (
+        <div className="border-t border-border px-5 py-2 text-[10px] text-[hsl(var(--fg-subtle))]">
+          {totalEmpty} untouched topics across all subjects
+        </div>
+      )}
     </div>
   );
 }
 
-/* ── Sub-components ── */
-
-function SectionLabel({ icon, text }) {
+function ChevronRight({ className }) {
   return (
-    <div className="flex items-center gap-3 py-1 select-none">
-      <span className="text-[hsl(var(--accent))] flex items-center">{icon}</span>
-      <span className="text-[11px] font-semibold tracking-[0.14em] uppercase text-[hsl(var(--fg-muted))]">{text}</span>
-      <span className="flex-1 border-t border-border ml-1" />
-    </div>
+    <svg className={className} width="12" height="12" viewBox="0 0 12 12" fill="none">
+      <path d="M4.5 2.5L7.5 6L4.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -275,69 +305,96 @@ function StudyStatus({ hasStudy }) {
   );
 }
 
-function PreparationSnapshot({ snapshot }) {
-  if (!snapshot) return null;
-  const metrics = [
-    { key: "subject_coverage", label: "Subject Coverage", value: snapshot.subject_coverage, icon: BookOpen, help: "% of questions with 1 correct solve + 2 SRS revisions" },
-    { key: "question_mastery", label: "Question Mastery", value: snapshot.question_mastery, icon: Target, help: "Average mastery across all attempted questions" },
-    { key: "revision_completion", label: "Revision Completion", value: snapshot.revision_completion, icon: RotateCcw, help: "Revision sessions completed in last 7 days" },
-    { key: "mock_readiness", label: "Mock Readiness", value: snapshot.mock_tests_exist ? snapshot.mock_readiness : 0, icon: FileText, help: "Log a Mock Test session to unlock", muted: !snapshot.mock_tests_exist },
-  ];
-  return (
-    <div className="card-2-accent p-5" data-testid={TID.pulseReadiness}>
-      <div className="flex items-center gap-2 mb-4">
-        <Zap className="w-4 h-4 text-[hsl(var(--accent))]" />
-        <h3 className="font-semibold text-sm">Preparation Snapshot</h3>
-      </div>
-      <div className="grid sm:grid-cols-2 gap-4">
-        {metrics.map((m) => {
-          const Icon = m.icon;
-          return (
-            <div key={m.key} className={m.muted ? "opacity-50" : ""} title={m.help}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-[hsl(var(--fg-muted))] flex items-center gap-1.5">
-                  <Icon className="w-3.5 h-3.5 text-[hsl(var(--fg-subtle))]" />{m.label}
-                </span>
-                <span className="mono font-semibold text-sm">{m.value}%</span>
-              </div>
-              <div className="w-full h-1.5 bg-[hsl(var(--bg-elev-2))] rounded overflow-hidden">
-                <div className={`h-full transition-all duration-300 ${m.muted ? "bg-[hsl(var(--bg-elev-2))]" : "bg-[hsl(var(--accent))]"}`} style={{ width: `${m.value}%` }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+function DailySnapshot({ todayQ, todayMin, qTarget, minTarget, sparkline, delta, dueRevisions, dueRevisits, qPct, minPct }) {
+  const maxSpark = Math.max(1, ...(sparkline || [1]));
+  const totalHrs = parseFloat((todayMin / 60).toFixed(1));
+  const dayNames = ["Su","M","Tu","W","Th","F","Sa"];
+  const dt = new Date();
+  const todayIdx = dt.getDay();
 
-function MomentumCard({ momentum, delta, sparkline }) {
-  const maxSpark = Math.max(1, ...(sparkline || []));
+  const weekdayLabels = sparkline ? sparkline.map((_, i) => {
+    const d = new Date(dt);
+    d.setDate(d.getDate() - (sparkline.length - 1 - i));
+    return dayNames[d.getDay()];
+  }) : [];
+
+  const effortLabel = totalHrs === 0
+    ? "0h today"
+    : totalHrs < 1
+      ? `${todayMin}m today`
+      : `${totalHrs}h today`;
+
+  const trend = delta > 5 ? "↑ Gaining momentum"
+    : delta < -5 ? "↓ Slowing this week"
+    : delta !== 0 ? "Steady pace"
+    : "First day — keep going";
+
+  const attention = dueRevisions > 0 || dueRevisits > 0
+    ? `${dueRevisions > 0 ? `${dueRevisions} revisions` : ""}${dueRevisions > 0 && dueRevisits > 0 ? ", " : ""}${dueRevisits > 0 ? `${dueRevisits} revisits` : ""} due`
+    : "Nothing overdue";
+
+  const goalStatus = qPct >= 100 && minPct >= 100
+    ? "Both targets met"
+    : qPct >= 100 ? "Questions met · minutes pending"
+    : minPct >= 100 ? "Minutes met · questions pending"
+    : `${qPct}% Q · ${minPct}% min of daily target`;
+
   return (
     <div className="card-2 p-5" data-testid={TID.pulseMomentum}>
-      <div className="label-x mb-1">Momentum</div>
-      <div className="flex items-end gap-2">
-        <div className={`text-4xl font-semibold mono ${MOMENTUM_COLORS(momentum)}`}>{momentum}</div>
-        {delta !== 0 && (
-          <div className={`flex items-center gap-0.5 text-xs font-medium pb-1 ${delta > 0 ? "text-[hsl(var(--success))]" : "text-[hsl(var(--danger))]"}`}>
-            {delta > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            <span className="mono">{delta > 0 ? "+" : ""}{delta}</span>
-          </div>
-        )}
+      {/* Row 1: effort + trend */}
+      <div className="flex items-baseline justify-between mb-3">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-3xl font-bold mono">{totalHrs}h</span>
+          <span className="text-sm text-[hsl(var(--fg-muted))]">{effortLabel}</span>
+        </div>
+        <span className={`text-[11px] px-2 py-0.5 rounded-full ${delta > 5 ? "bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]" : delta < -5 ? "bg-[hsl(var(--danger))]/10 text-[hsl(var(--danger))]" : "bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg-muted))]"}`}>
+          {trend}
+        </span>
       </div>
+
+      {/* Row 2: sparkline with today highlighted */}
       {sparkline && sparkline.length > 0 && (
-        <div className="flex items-end gap-[3px] h-7 mt-2">
-          {sparkline.map((mins, i) => (
-            <div
-              key={i}
-              className="flex-1 rounded-sm bg-[hsl(var(--accent))]/60 hover:bg-[hsl(var(--accent))] transition-colors"
-              style={{ height: `${Math.max(4, (mins / maxSpark) * 100)}%` }}
-              title={`${mins} min`}
-            />
-          ))}
+        <div className="flex items-end gap-[2px] h-12 mb-3">
+          {sparkline.map((mins, i) => {
+            const isToday = i === sparkline.length - 1;
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                <div
+                  className={`w-full rounded-sm transition-all ${isToday ? "bg-[hsl(var(--accent))] shadow-[0_0_6px_hsl(var(--accent)/0.4)]" : "bg-[hsl(var(--accent))]/30 hover:bg-[hsl(var(--accent))]/60"}`}
+                  style={{ height: `${Math.max(3, (mins / maxSpark) * 100)}%` }}
+                  title={`${weekdayLabels[i] || ""}: ${mins}m`}
+                />
+                <span className={`text-[7px] ${isToday ? "text-[hsl(var(--accent))] font-semibold" : "text-[hsl(var(--fg-subtle))]"}`}>
+                  {weekdayLabels[i]}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
-      <p className="text-[10px] text-[hsl(var(--fg-subtle))] mt-1.5">7-day consistency score</p>
+
+      {/* Row 3: quick stats */}
+      <div className="grid grid-cols-3 gap-2 mb-2">
+        <div className="text-center">
+          <div className="text-sm font-semibold mono">{todayQ}<span className="text-[10px] text-[hsl(var(--fg-muted))] font-normal">/{qTarget}</span></div>
+          <div className="text-[10px] text-[hsl(var(--fg-subtle))]">Questions</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm font-semibold mono">{todayMin}<span className="text-[10px] text-[hsl(var(--fg-muted))] font-normal">/{minTarget}</span></div>
+          <div className="text-[10px] text-[hsl(var(--fg-subtle))]">Minutes</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm font-semibold mono">{dueRevisions + dueRevisits}</div>
+          <div className="text-[10px] text-[hsl(var(--fg-subtle))]">Due</div>
+        </div>
+      </div>
+
+      {/* Row 4: insight */}
+      <div className="flex items-center gap-1.5 text-[11px]">
+        <span className="text-[hsl(var(--fg-muted))]">{attention}</span>
+        <span className="text-[hsl(var(--fg-subtle))]">·</span>
+        <span className="text-[hsl(var(--fg-muted))]">{goalStatus}</span>
+      </div>
     </div>
   );
 }
@@ -397,41 +454,3 @@ function WeakTopicsCard({ weakTopics, expanded, toggle, navigate }) {
   );
 }
 
-function SubjectCompletionCard({ subjects }) {
-  return (
-    <div className="card-2 p-5" data-testid={TID.pulseSubjectCompletion}>
-      <div className="flex items-center gap-2 mb-3">
-        <BookOpen className="w-4 h-4 text-[hsl(var(--info))]" />
-        <h3 className="font-semibold text-sm">Subject Completion</h3>
-        <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--fg-subtle))] ml-1">sorted by completion</span>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-        {subjects.map((s) => (
-          <div key={s.subject} className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <span className={`w-8 shrink-0 mono text-[11px] font-semibold ${subjectColor(s.subject).text}`}>{s.subject}</span>
-            <span className="text-[11px] text-[hsl(var(--fg-muted))] flex-1 truncate min-w-0">{SUBJECT_LABELS[s.subject]}</span>
-            <span className="text-[11px] mono text-[hsl(var(--fg-muted))] w-12 text-right shrink-0">{s.completed}/{s.total}</span>
-            <div className="w-16 sm:w-20 h-1.5 bg-[hsl(var(--bg-elev-2))] rounded overflow-hidden shrink-0">
-              <div className={`h-full transition-all duration-300 ${subjectColor(s.subject).bar}`} style={{ width: `${s.percent}%` }} />
-            </div>
-            <span className="mono text-[11px] w-8 text-right shrink-0">{s.percent}%</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ProgressLine({ label, value, target, pct }) {
-  return (
-    <div>
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-[hsl(var(--fg-muted))]">{label}</span>
-        <span className="mono">{value}/{target}</span>
-      </div>
-      <div className="w-full h-1.5 bg-[hsl(var(--bg-elev-2))] rounded mt-1 overflow-hidden">
-        <div className="h-full bg-[hsl(var(--accent))] transition-all duration-300" style={{ width: `${Math.min(100, pct)}%` }} />
-      </div>
-    </div>
-  );
-}
