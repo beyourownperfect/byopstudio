@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, AlertTriangle, BookOpen, Target, RotateCcw, FileText, Settings as SettingsIcon, ChevronDown, ArrowRight, CheckCircle, Circle, BarChart3 } from "lucide-react";
+import { Zap, AlertTriangle, BookOpen, Target, RotateCcw, FileText, Settings as SettingsIcon, ChevronDown, ArrowRight, CheckCircle, Circle, BarChart3, HelpCircle } from "lucide-react";
 import { pulseApi, settingsApi } from "@/lib/api";
 import { SUBJECT_LABELS, TID } from "@/lib/constants";
 import { fmtDateLong } from "@/lib/dateUtils";
@@ -181,10 +181,10 @@ function SubjectReadiness({ subjects, snapshot, topicReadiness, overallCompleted
   const toggleSubject = (subj) => setExpandedSubjects((e) => ({ ...e, [subj]: !e[subj] }));
 
   const metrics = snapshot ? [
-    { key: "subject_coverage", label: "Coverage", value: Math.round((overallCompleted / Math.max(1, overallTotal)) * 100), icon: BookOpen },
-    { key: "question_mastery", label: "Mastery", value: snapshot.question_mastery, icon: Target },
-    { key: "revision_completion", label: "Revision", value: snapshot.revision_completion, icon: RotateCcw },
-    { key: "mock_readiness", label: "Mock", value: snapshot.mock_tests_exist ? snapshot.mock_readiness : 0, icon: FileText, muted: !snapshot.mock_tests_exist },
+    { key: "subject_coverage", label: "Coverage", value: Math.round((overallCompleted / Math.max(1, overallTotal)) * 100), icon: BookOpen, help: "% of questions with 1 correct solve + 2 successful SRS revisions" },
+    { key: "question_mastery", label: "Mastery", value: snapshot.question_mastery, icon: Target, help: "Average mastery score across all attempted questions (blend of SRS interval progression and accuracy)" },
+    { key: "revision_completion", label: "Revision", value: snapshot.revision_completion, icon: RotateCcw, help: "Revision sessions completed in the last 7 days (10% per session, capped at 100%)" },
+    { key: "mock_readiness", label: "Mock", value: snapshot.mock_tests_exist ? snapshot.mock_readiness : 0, icon: FileText, muted: !snapshot.mock_tests_exist, help: "Based on average subject completion (60%) + Mock Test activity (40%). Log a Mock Test to unlock" },
   ] : [];
 
   const totalEmpty = topicReadiness ? topicReadiness.reduce((sum, s) => sum + s.topics.filter((t) => !t.has_questions && !t.has_lectures).length, 0) : 0;
@@ -198,10 +198,16 @@ function SubjectReadiness({ subjects, snapshot, topicReadiness, overallCompleted
             {metrics.map((m) => {
               const Icon = m.icon;
               return (
-                <div key={m.key} className={m.muted ? "opacity-40" : ""} title={m.label}>
+                <div key={m.key} className={m.muted ? "opacity-40" : ""}>
                   <div className="flex items-center gap-1 mb-1">
                     <Icon className="w-3 h-3 text-[hsl(var(--fg-subtle))] shrink-0" />
                     <span className="text-[10px] text-[hsl(var(--fg-muted))]">{m.label}</span>
+                    <span className="relative group cursor-help shrink-0">
+                      <HelpCircle className="w-3 h-3 text-[hsl(var(--fg-subtle))]/50 group-hover:text-[hsl(var(--accent))] transition-colors" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-44 text-[10px] bg-[hsl(var(--bg-elev-2))] border border-border rounded px-2 py-1 text-[hsl(var(--fg-muted))] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 text-center leading-relaxed">
+                        {m.help}
+                      </span>
+                    </span>
                   </div>
                   <div className="flex items-end gap-1">
                     <span className="mono font-semibold text-sm">{m.value}%</span>

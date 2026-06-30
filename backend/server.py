@@ -1315,7 +1315,7 @@ async def calendar(start: str, end: str, category: Optional[str] = None):
 async def _momentum_raw(logs: list) -> dict:
     """Return momentum score + daily minutes sparkline from pre-fetched logs."""
     if not logs:
-        return {"score": 0, "daily_minutes": [], "active_days": 0}
+        return {"score": 0, "daily_minutes": {}, "active_days": 0}
     active_days = len({log["date"] for log in logs})
     subjects_touched = len({log["subject"] for log in logs})
     qs = sum(log.get("questions_attempted", 0) for log in logs)
@@ -2251,6 +2251,23 @@ async def get_resource(filename: str):
     if not file_path.is_file() or ".." in filename or "/" in filename:
         raise HTTPException(404, "File not found")
     return FileResponse(file_path)
+
+
+# ============================ ADMIN =================================
+@api_router.post("/admin/reset")
+async def admin_reset():
+    """Delete all user data. Keeps settings, syllabus, and uploads intact."""
+    collections = [
+        "questions", "study_logs", "timeline", "attempts", "srs",
+        "revisits", "user_missions", "lectures", "subject_completion",
+    ]
+    deleted = {}
+    for col_name in collections:
+        col = db[col_name]
+        result = await col.delete_many({})
+        deleted[col_name] = result.deleted_count
+    _pulse_cache["timestamp"] = 0
+    return {"reset": True, "deleted": deleted, "kept": ["settings", "syllabus", "uploads"]}
 
 
 # ============================ MOUNT =================================
