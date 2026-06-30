@@ -1556,7 +1556,7 @@ async def pulse():
         "overall_completion_percent": overall_completion_percent,
         "overall_completed": overall_completed,
         "overall_total": overall_total,
-        "topic_readiness": _compute_topic_readiness(),
+        "topic_readiness": await _compute_topic_readiness(),
         "pyq_percent": pyq_percent,
         "pyq_done": pyq_done,
         "pyq_total": pyq_total,
