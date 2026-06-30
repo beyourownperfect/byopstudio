@@ -35,7 +35,7 @@ export default function RevisitMenu({ itemType, itemId, itemTitle = "", itemSubj
         data-testid={TID.revisitMenuTrigger}
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
         className={`${compact ? "btn-ghost p-1 text-xs" : "btn"} ${className}`}
-        title="Schedule a revisit"
+        title="Schedule a manual revisit reminder"
       >
         <Clock className="w-3.5 h-3.5" strokeWidth={1.75} /> {!compact && label}
       </button>

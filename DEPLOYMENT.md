@@ -105,6 +105,8 @@ curl -X POST https://byopstudio.onrender.com/api/seed-demo
 
 The endpoint is idempotent — running it again does nothing if questions already exist.
 
+To verify the execution queue is populated: `curl https://byopstudio.onrender.com/api/queue`
+
 You can now open `https://byopstudio.onrender.com` and see the app with sample data.
 
 ---

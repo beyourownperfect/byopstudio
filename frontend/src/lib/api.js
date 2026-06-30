@@ -101,3 +101,7 @@ export const subjectCompletionApi = {
 };
 
 export const seed = () => c.post("/seed-demo").then((r) => r.data);
+
+export const queueApi = {
+  get: () => c.get("/queue").then((r) => r.data),
+};

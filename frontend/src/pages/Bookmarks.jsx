@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Star, Play, ExternalLink } from "lucide-react";
 import { questionsApi } from "@/lib/api";
-import { TID } from "@/lib/constants";
+import { SUBJECT_LABELS, TID } from "@/lib/constants";
 import { relLabel } from "@/lib/dateUtils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
@@ -51,7 +51,7 @@ export default function Bookmarks() {
           {items.map((q) => (
             <div key={q.id} className="px-4 py-3 row-hover flex items-start gap-3">
               <div className="flex flex-col gap-1 items-center pt-1">
-                <span className="chip chip-accent">{q.subject}</span>
+                <span className="chip chip-accent" title={SUBJECT_LABELS[q.subject]}>{q.subject}</span>
                 <span className="chip mono text-[10px]">{q.mastery ?? 0}</span>
               </div>
               <div className="flex-1 min-w-0">

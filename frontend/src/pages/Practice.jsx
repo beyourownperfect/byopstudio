@@ -1,12 +1,13 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Star, ChevronRight, ChevronLeft, ExternalLink, Check, X as XIcon, Clock, Play } from "lucide-react";
+import { Star, ChevronRight, ChevronLeft, ExternalLink, Check, X as XIcon, Clock, Play, BarChart3 } from "lucide-react";
 import { practiceApi, questionsApi } from "@/lib/api";
 import { SUBJECTS, TID } from "@/lib/constants";
 import { relLabel } from "@/lib/dateUtils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
 import HelpButton from "@/components/HelpButton";
+import SubjectSelect from "@/components/SubjectSelect";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
 const MODES = [
@@ -33,9 +34,14 @@ export default function Practice() {
   const [excludeIds, setExcludeIds] = useState([]);
   const startTimeRef = useRef(null);
   // Practice queue — history of seen questions with current index
+  // Practice queue — history of seen questions with current index
   const [queue, setQueue] = useState([]);
   const [queueIdx, setQueueIdx] = useState(-1);
   const queueRef = useRef({ queue: [], queueIdx: -1 });
+
+  // Session stats
+  const [session, setSession] = useState({ total: 0, correct: 0, timeSec: 0, confidenceTotal: 0, masteryChanges: 0, prevMastery: null });
+  const sessionRef = useRef(session);
 
   // Stopwatch
   const [elapsed, setElapsed] = useState(0);
@@ -46,6 +52,34 @@ export default function Practice() {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000)), 1000);
     return () => clearInterval(t);
   }, [q, feedback]);
+
+  // Keyboard shortcuts for solving
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target?.tagName || "").toLowerCase();
+      if (["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable) return;
+      if (!started || !q) return;
+
+      if (feedback) {
+        if (e.key === "ArrowRight" || e.key === "Enter") { e.preventDefault(); goNext(); }
+        else if (e.key === "ArrowLeft") { e.preventDefault(); goBack(); }
+        return;
+      }
+
+      if (["a", "b", "c", "d"].includes(e.key.toLowerCase()) && q.question_type !== "NAT") {
+        e.preventDefault();
+        toggleOption(e.key.toUpperCase());
+      } else if (["1", "2", "3", "4", "5"].includes(e.key)) {
+        e.preventDefault();
+        setConfidence(parseInt(e.key));
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        submit();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [started, q, feedback]); // eslint-disable-line
 
   const fetchNext = async (m = mode, s = subject, exclude = excludeIds) => {
     setFeedback(null);
@@ -94,11 +128,22 @@ export default function Practice() {
 
     setSubmitting(true);
     const elapsedSec = Math.floor((Date.now() - (startTimeRef.current || Date.now())) / 1000);
+    const prevMastery = q.mastery ?? 0;
     const res = await practiceApi.submit({
       question_id: q.id, correct, confidence, user_answer: userAnswer, time_taken_sec: elapsedSec,
     });
     setFeedback({ ...res, correct });
     setSubmitting(false);
+
+    const newMastery = res.mastery ?? 0;
+    setSession((s) => ({
+      total: s.total + 1,
+      correct: s.correct + (correct ? 1 : 0),
+      timeSec: s.timeSec + elapsedSec,
+      confidenceTotal: s.confidenceTotal + confidence,
+      masteryChanges: s.masteryChanges + (newMastery - prevMastery),
+      prevMastery: prevMastery,
+    }));
   };
 
   const goNext = async () => {
@@ -144,10 +189,7 @@ export default function Practice() {
         </div>
         <div>
           <label className="label-x">Subject</label>
-          <select data-testid={TID.practiceSubjectSelect} value={subject} onChange={(e) => setSubject(e.target.value)} className="input mt-1">
-            <option value="ALL">All subjects</option>
-            {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          <SubjectSelect data-testid={TID.practiceSubjectSelect} value={subject} onChange={(e) => setSubject(e.target.value)} className="input mt-1" allOption />
         </div>
         <button data-testid={TID.practiceStartBtn} onClick={start} className="btn btn-primary w-full">
           <Play className="w-3.5 h-3.5" /> Start
@@ -157,11 +199,40 @@ export default function Practice() {
   }
 
   if (!q) {
+    const hasSession = session.total > 0;
+    const pct = hasSession ? Math.round((session.correct / session.total) * 100) : 0;
+    const avgConf = hasSession ? (session.confidenceTotal / session.total).toFixed(1) : "0";
+    const totalMin = Math.round(session.timeSec / 60);
+    const masteryDelta = Math.round(session.masteryChanges);
     return (
-      <div className="card-2 p-12 text-center max-w-md mx-auto mt-12">
-        <p className="font-semibold mb-2">Nothing to practice here.</p>
-        <p className="text-xs text-[hsl(var(--fg-muted))] mb-4">Try a different mode or filter.</p>
-        <button onClick={() => { setStarted(false); setExcludeIds([]); navigate("/solve/practice"); }} className="btn">Change mode</button>
+      <div className="card-2 p-8 text-center max-w-lg mx-auto mt-12 space-y-4">
+        {hasSession ? (
+          <>
+            <BarChart3 className="w-8 h-8 text-[hsl(var(--accent))] mx-auto" />
+            <h2 className="text-xl font-semibold">Session complete</h2>
+            <div className="grid grid-cols-2 gap-3 text-left">
+              <div className="card-1 px-3 py-2"><div className="label-x">Questions</div><div className="text-lg mono font-semibold">{session.total}</div></div>
+              <div className="card-1 px-3 py-2"><div className="label-x">Correct</div><div className="text-lg mono font-semibold text-[hsl(var(--success))]">{session.correct} ({pct}%)</div></div>
+              <div className="card-1 px-3 py-2"><div className="label-x">Time</div><div className="text-lg mono font-semibold">{totalMin} min</div></div>
+              <div className="card-1 px-3 py-2"><div className="label-x">Confidence avg</div><div className="text-lg mono font-semibold">{avgConf}/5</div></div>
+            </div>
+            {masteryDelta !== 0 && (
+              <p className="text-xs text-[hsl(var(--fg-muted))]">
+                Mastery {masteryDelta > 0 ? "+" : ""}{masteryDelta}% across {session.total} question{session.total !== 1 ? "s" : ""}
+              </p>
+            )}
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button onClick={() => { setStarted(false); setExcludeIds([]); setSession({ total: 0, correct: 0, timeSec: 0, confidenceTotal: 0, masteryChanges: 0, prevMastery: null }); setQueue([]); setQueueIdx(-1); navigate("/solve/practice"); }} className="btn">New session</button>
+              <button onClick={() => navigate("/log")} className="btn btn-primary">View log</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="font-semibold mb-2">Nothing to practice here.</p>
+            <p className="text-xs text-[hsl(var(--fg-muted))] mb-4">Try a different mode or filter.</p>
+            <button onClick={() => { setStarted(false); setExcludeIds([]); navigate("/solve/practice"); }} className="btn">Change mode</button>
+          </>
+        )}
       </div>
     );
   }
@@ -198,6 +269,9 @@ export default function Practice() {
           </div>
           <Clock className="w-3 h-3" /> <span className="mono">{Math.floor(elapsed / 60).toString().padStart(2, "0")}:{(elapsed % 60).toString().padStart(2, "0")}</span>
           <HelpButton moduleKey="practice-active" title={HELP_CONTENT.practice.title} sections={HELP_CONTENT.practice.sections} />
+          {session.total > 0 && (
+            <button onClick={() => setQ(null)} className="btn-ghost p-1 text-[hsl(var(--fg-muted))] hover:text-[hsl(var(--fg))]" title="End session & see summary"><XIcon className="w-3.5 h-3.5" /></button>
+          )}
         </div>
       </div>
 
@@ -250,16 +324,23 @@ export default function Practice() {
 
         {!feedback && (
           <div className="mt-5 flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="label-x">Confidence</span>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  data-testid={TID.practiceConfidence(n)}
-                  onClick={() => setConfidence(n)}
-                  className={`w-7 h-7 rounded border-2 text-xs font-semibold ${confidence === n ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))]" : "border-border text-[hsl(var(--fg-muted))]"}`}
-                >{n}</button>
-              ))}
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="label-x">Confidence</span>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    data-testid={TID.practiceConfidence(n)}
+                    onClick={() => setConfidence(n)}
+                    className={`w-7 h-7 rounded border-2 text-xs font-semibold ${confidence === n ? "border-[hsl(var(--accent))] bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))]" : "border-border text-[hsl(var(--fg-muted))]"}`}
+                  >{n}</button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2" style={{ paddingLeft: "54px" }}>
+                {["Guess", "Unsure", "Fairly", "Confid.", "Certain"].map((label, i) => (
+                  <span key={i} className="w-7 text-center text-[8px] text-[hsl(var(--fg-subtle))] leading-tight">{label}</span>
+                ))}
+              </div>
             </div>
             <button
               data-testid={TID.practiceSubmit}
@@ -271,6 +352,9 @@ export default function Practice() {
             </button>
           </div>
         )}
+        <p className="text-[10px] text-[hsl(var(--fg-subtle))] mt-3 text-center">
+          A–D pick · 1–5 confidence · Space/Enter submit · ←→ navigate
+        </p>
       </div>
 
       {feedback && (

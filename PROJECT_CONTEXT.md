@@ -1,6 +1,6 @@
 # BYOPGateCS.studio — Project Context
 
-Single-user GATE CS study operating system. Capture questions → solve under SRS → schedule revisions → measure momentum. **v1.0 production-ready.** Deployed as a single Render web service backed by MongoDB Atlas.
+Single-user GATE CS study operating system. Capture questions → solve under SRS → schedule revisions → measure momentum. **v1.1 production-ready.** Deployed as a single Render web service backed by MongoDB Atlas.
 
 ---
 
@@ -117,6 +117,7 @@ Question is "completed" when `interval_idx >= 3 AND correct_attempts >= 3`.
 | GET/POST/PUT/DELETE | `/api/user-missions[/{id}]` | User-authored mission tasks |
 | POST | `/api/user-missions/reorder` | Drag-to-reorder missions |
 | GET/PUT | `/api/settings` | Singleton settings |
+| GET | `/api/queue` | Aggregated execution queue (SRS + timeline revs + revisits + missions) |
 | POST | `/api/seed-demo` | Seed 12 sample questions (one per subject) |
 | GET | `/api/meta` | Counts and metadata |
 
@@ -125,13 +126,13 @@ Question is "completed" when `interval_idx >= 3 AND correct_attempts >= 3`.
 ## 7. Frontend Pages
 
 ### Pulse (`/pulse`)
-Dashboard with **Today** section (MissionCard, Momentum, Due Today, Today's Progress), **Readiness** section (PreparationSnapshot, WeakTopics, SubjectCompletion), and **Lectures** section (LectureTable). StudyTimer in header. GATE countdown and settings modal. Card-2 headers with box-shadow depth and section dividers.
+Dashboard with **Today** section (MissionCard, Execution Queue, Momentum, Today's Progress), **Readiness** section (PreparationSnapshot, WeakTopics, SubjectCompletion), and **Lectures** section (LectureTable). StudyTimer in header. GATE countdown and settings modal (exam date + daily targets). Onboarding card for zero-data users. Card-2 headers with box-shadow depth and section dividers.
 
 ### Repository (`/solve/repository`)
 Question bank with inline-editable grid table. 8 columns: checkbox, subject, type, statement (plain-text truncated for uniform row height), mastery bar, next revision, revisit, actions. Filter by subject/mode, search, sort, CSV import/export, bulk delete with undo, OCR prompt modal.
 
 ### Practice (`/solve/practice`)
-Setup screen (mode + subject picker) → Active solving with MCQ/MSQ/NAT. Confidence 1-5, stopwatch, feedback with explanation, bookmark, revisit scheduling. Queue navigation with prev/next. Auto-creates study_logs via `POST /api/practice/submit` that batches one log per subject per day.
+Setup screen (mode + subject picker) → Active solving with MCQ/MSQ/NAT. Confidence 1-5 with labels (Guess → Certain), keyboard shortcuts (A-D pick, 1-5 confidence, Space/Enter submit, ←→ navigate), stopwatch, feedback with explanation, bookmark, revisit scheduling. Queue navigation with prev/next. Session summary on finish (or end-early via × button). Auto-creates study_logs via `POST /api/practice/submit` that batches one log per subject per day.
 
 ### Bookmarks (`/solve/bookmarks`)
 Starred questions in a list. Subject badge, mastery, statement, next review. Quick actions: unstar, practice, revisit, GateOverflow link.
@@ -140,7 +141,7 @@ Starred questions in a list. Subject badge, mastery, statement, next review. Qui
 Wrong answers by 5 modes: All wrong, Wrong today, Frequently wrong (2+), Forgotten, Bookmarked mistakes. Filter, practice-all button.
 
 ### Log (`/log`)
-Live stopwatch (Space=pause, R=reset, N=new log) with subject/activity/topic/journal. Session summary cards. Daily/weekly/monthly views with collapsible date groups. **LectureTable** (shared component) and **SubjectCompletion** checklist below.
+Live timer status bridged from PULSE (sessionStorage polling). Session summary cards. Daily/weekly/monthly views with collapsible date groups. **LectureTable** (shared component) and **SubjectCompletion** checklist below. Keyboard shortcut: N = new log. Subject codes shown with full names in dropdowns and chips.
 
 ### Timeline (`/timeline`)
 Daily/weekly/monthly calendar of entries, scheduled revisions, and revisits. New entry modal with revision scheduling presets (+1d/+3d/+7d/+14d/+30d).
@@ -152,16 +153,18 @@ Daily/weekly/monthly calendar of entries, scheduled revisions, and revisits. New
 | Component | Used In | Description |
 |-----------|---------|-------------|
 | `LectureTable` | Pulse, Log | Inline-editable table with 7 columns, collapsible subject groups, sort/filter, sticky header, auto-save |
-| `StudyTimer` | Pulse | Stopwatch/countdown with focus modal, auto-log on countdown complete, manual save button |
-| `MissionCard` | Pulse | Top 4 prioritized daily actions |
+| `StudyTimer` | Pulse | Stopwatch/countdown with focus modal, topic input, keyboard shortcuts (Space/R), auto-log on countdown complete, manual save button, sessionStorage persistence |
+| `MissionCard` | Pulse | User-authored checklist with add/complete/edit/reorder/delete |
+| `QueueCard` | Pulse | System-generated execution queue aggregating SRS, timeline revisions, revisits, missions. Prioritized into Overdue/Today/This Week/Upcoming. Deep-links to owning modules |
+| `SubjectSelect` | All pages | Dropdown showing subject codes with full names (e.g. "COA — Computer Org."), optional "All subjects" |
 | `MarkdownRenderer` | Practice, Details | ReactMarkdown with LaTeX via rehype-katex |
 | `QuestionFormModal` | Repository | Create/edit question form |
 | `QuestionDetailsModal` | Repository | Full question view with attempts history |
-| `TimelineEntryModal` | Timeline | Create/edit timeline entry |
-| `RevisitMenu` | Repository, Practice, etc. | Quick revisit scheduling |
+| `TimelineEntryModal` | Timeline | Create/edit timeline entry with SRS revision scheduling |
+| `RevisitMenu` | Repository, Practice, etc. | "manual reminder" scheduling tooltip |
 | `HelpButton` | All pages | ? icon → modal with contextual quick guide |
 | `CommandPalette` | Layout | Cmd/Ctrl-K global command search |
-| `Layout` | All pages | Sidebar nav + responsive hamburger drawer |
+| `Layout` | All pages | Header nav + Cmd-K discovery toast + responsive hamburger drawer |
 
 ---
 
@@ -204,10 +207,12 @@ All pages use `space-y-6` (24px) between sections with headers inside `card-2` c
 - **No auth** — single-user app eliminates entire auth complexity
 - **Optimistic UI** — bookmarks, deletes, edits reflect instantly; server is fallback
 - **SPA served by FastAPI** — single Render service, no CORS issues in production
-- **StudyTimer auto-logging** — countdown completion automatically creates a study_log entry; manual Save button on the inline bar
-- **Practice auto-logs batch** — one log per subject per day, not one per question
-- **Timeline logs** — creating a timeline entry auto-creates a linked study_log (unless `skip_log: true`)
+- **StudyTimer auto-logging** — countdown completion automatically creates a study_log entry + timeline entry; manual Save button on the inline bar
+- **Practice auto-logs batch** — one log per subject per day, not one per question; also upserts daily practice timeline entries
+- **Timeline bridging** — creating a timeline entry auto-creates a linked study_log; completing a revisit creates both a study_log and a timeline entry
+- **Reverse bridge** — orphan study logs (from timer, manual log, revisit complete) auto-create matching timeline entries so everything appears on the calendar
 - **Revision logs** — completing a timeline revision creates a "Revision" study_log
+- **Execution queue** — aggregated SRS + timeline revisions + revisits + missions into a single prioritized queue on Pulse
 - **Calendar is read-side aggregate** — no materialized view; sums study_logs on read
 - **Exam date auto-advance** — if persisted date is in the past, `_get_settings()` resets to default
 - **Seed covers all 12 subjects** — one question per GATE subject
@@ -236,4 +241,4 @@ All pages use `space-y-6` (24px) between sections with headers inside `card-2` c
 
 ---
 
-*Last updated: 2026-06-30 · v1.0*
+*Last updated: 2026-06-30 · v1.1*

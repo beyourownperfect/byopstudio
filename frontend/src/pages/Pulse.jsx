@@ -8,6 +8,7 @@ import HelpButton from "@/components/HelpButton";
 import MissionCard from "@/components/MissionCard";
 import LectureTable from "@/components/LectureTable";
 import StudyTimer from "@/components/StudyTimer";
+import QueueCard from "@/components/QueueCard";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
 const MOMENTUM_COLORS = (n) =>
@@ -21,13 +22,21 @@ export default function Pulse() {
   const [data, setData] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [examDate, setExamDate] = useState("");
+  const [dailyQ, setDailyQ] = useState(0);
+  const [dailyMin, setDailyMin] = useState(0);
+  const [dailyRev, setDailyRev] = useState(0);
   const [weakExpanded, setWeakExpanded] = useState(false);
 
   const load = async () => setData(await pulseApi.get());
   useEffect(() => { load(); }, []);
 
   const saveSettings = async () => {
-    if (examDate) await settingsApi.update({ exam_date: examDate });
+    const payload = {};
+    if (examDate) payload.exam_date = examDate;
+    if (dailyQ) payload.daily_question_target = dailyQ;
+    if (dailyMin) payload.daily_study_minutes_target = dailyMin;
+    if (dailyRev) payload.daily_revision_target = dailyRev;
+    if (Object.keys(payload).length > 0) await settingsApi.update(payload);
     setShowSettings(false);
     load();
   };
@@ -49,6 +58,8 @@ export default function Pulse() {
     );
   }
 
+  const isOnboarding = !data.has_study_today && data.overall_total === 0;
+
   return (
     <div className="space-y-6">
       {/* ━━━ Header ━━━ */}
@@ -67,17 +78,39 @@ export default function Pulse() {
             <div className="font-semibold mono text-lg">{data.days_until_exam}<span className="text-[hsl(var(--fg-muted))] text-xs ml-1">days</span></div>
             <StudyStatus hasStudy={data.has_study_today} />
           </div>
-          <button onClick={() => { setExamDate(data.exam_date); setShowSettings(true); }} className="btn-ghost p-2 hover:bg-[hsl(var(--bg-elev-2))] transition-colors"><SettingsIcon className="w-4 h-4" /></button>
+          <button onClick={() => { setExamDate(data.exam_date); setDailyQ(data.targets.daily_question_target); setDailyMin(data.targets.daily_study_minutes_target); setDailyRev(data.targets.daily_revision_target); setShowSettings(true); }} className="btn-ghost p-2 hover:bg-[hsl(var(--bg-elev-2))] transition-colors"><SettingsIcon className="w-4 h-4" /></button>
         </div>
       </div>
+
+      {isOnboarding && (
+        <div className="card-2-accent p-6 space-y-4" data-testid="pulse-onboarding">
+          <h2 className="text-lg font-semibold">Welcome to your GATE CS Study OS</h2>
+          <p className="text-sm text-[hsl(var(--fg-muted))]">Everything starts empty — let's get you set up in 30 seconds.</p>
+          <div className="space-y-2">
+            <button onClick={() => { setExamDate(data.exam_date || "2027-02-07"); setShowSettings(true); }} className="btn w-full text-left flex items-center gap-3">
+              <span className="w-6 h-6 rounded-full bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))] flex items-center justify-center text-xs font-semibold">1</span>
+              <span>Set your GATE exam date <span className="text-[hsl(var(--fg-subtle))]">— drives the countdown</span></span>
+            </button>
+            <button onClick={() => navigate("/solve/repository")} className="btn w-full text-left flex items-center gap-3">
+              <span className="w-6 h-6 rounded-full bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))] flex items-center justify-center text-xs font-semibold">2</span>
+              <span>Add questions <span className="text-[hsl(var(--fg-subtle))]">— load sample, import CSV, or create manually</span></span>
+            </button>
+            <button onClick={() => navigate("/solve/practice")} className="btn w-full text-left flex items-center gap-3">
+              <span className="w-6 h-6 rounded-full bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))] flex items-center justify-center text-xs font-semibold">3</span>
+              <span>Start solving <span className="text-[hsl(var(--fg-subtle))]">— SRS-backed practice with spaced repetition</span></span>
+            </button>
+          </div>
+          <p className="text-[10px] text-[hsl(var(--fg-subtle))]">This card disappears once you have questions or activity. Press <kbd className="px-1 py-px bg-[hsl(var(--bg-elev-2))] rounded text-[10px]">⌘K</kbd> to search anything.</p>
+        </div>
+      )}
 
       {/* ━━━ Today ━━━ */}
       <SectionLabel icon={<Zap className="w-3.5 h-3.5" />} text="Today" />
       <div className="space-y-4">
         <MissionCard />
-        <div className="grid md:grid-cols-3 gap-4">
+        <QueueCard />
+        <div className="grid md:grid-cols-2 gap-4">
           <MomentumCard momentum={data.momentum} delta={data.momentum_delta} sparkline={data.momentum_sparkline} />
-          <DueTodayCard dueRevisions={data.due_revisions} dueRevisits={data.due_revisits} navigate={navigate} />
           <div className="card-2-time p-5">
             <div className="label-x mb-1">Today&apos;s progress</div>
             <div className="space-y-2 mt-1">
@@ -109,6 +142,20 @@ export default function Pulse() {
             <div>
               <label className="label-x">GATE Exam Date</label>
               <input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} className="input mt-1" />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="label-x">Daily Q target</label>
+                <input type="number" min="0" value={dailyQ} onChange={(e) => setDailyQ(parseInt(e.target.value) || 0)} className="input mt-1" />
+              </div>
+              <div>
+                <label className="label-x">Daily min target</label>
+                <input type="number" min="0" value={dailyMin} onChange={(e) => setDailyMin(parseInt(e.target.value) || 0)} className="input mt-1" />
+              </div>
+              <div>
+                <label className="label-x">Daily rev target</label>
+                <input type="number" min="0" value={dailyRev} onChange={(e) => setDailyRev(parseInt(e.target.value) || 0)} className="input mt-1" />
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={() => setShowSettings(false)} className="btn">Cancel</button>
@@ -218,24 +265,55 @@ function MomentumCard({ momentum, delta, sparkline }) {
   );
 }
 
-function DueTodayCard({ dueRevisions, dueRevisits, navigate }) {
+function DueTodayCard({ dueSrs, dueTimelineRevisions, dueTimelineRevisionsList, dueRevisits, navigate }) {
+  const tlDue = dueTimelineRevisionsList || [];
   return (
     <div className="card-2 p-5 bg-[hsl(var(--accent))]/[0.04] border-[hsl(var(--accent))]/20" data-testid={TID.pulseDueRev}>
-      <div className="label-x mb-1">Due Today</div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="label-x mb-2">Due Today</div>
+      <div className="space-y-3">
         <button
           onClick={() => navigate("/solve/practice?mode=due")}
-          className="group text-left p-2 -m-2 rounded hover:bg-[hsl(var(--accent))]/[0.08] transition-colors"
+          className="group text-left p-2 -m-2 rounded hover:bg-[hsl(var(--accent))]/[0.08] transition-colors block w-full"
         >
           <div className="flex items-center gap-1">
-            <span className="text-3xl font-semibold mono">{dueRevisions}</span>
+            <span className="text-3xl font-semibold mono">{dueSrs}</span>
             <ArrowRight className="w-3.5 h-3.5 text-[hsl(var(--accent))] opacity-0 group-hover:opacity-100 transition-opacity translate-x-0 group-hover:translate-x-0.5 transition-transform" />
           </div>
           <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-0.5">SRS revisions</div>
         </button>
+        {tlDue.length > 0 && (
+          <div>
+            <button
+              onClick={() => navigate("/timeline?view=daily")}
+              className="group text-left p-2 -m-2 rounded hover:bg-[hsl(var(--accent))]/[0.08] transition-colors block w-full"
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-3xl font-semibold mono">{dueTimelineRevisions}</span>
+                <ArrowRight className="w-3.5 h-3.5 text-[hsl(var(--accent))] opacity-0 group-hover:opacity-100 transition-opacity translate-x-0 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+              <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-0.5">Timeline revisions</div>
+            </button>
+            <div className="mt-2 space-y-1">
+              {tlDue.slice(0, 3).map((tr) => (
+                <button
+                  key={tr.entry_id + "-" + tr.date}
+                  onClick={() => navigate("/timeline?view=daily")}
+                  className="w-full text-left px-2 py-1 rounded border border-border text-xs hover:bg-[hsl(var(--accent))]/[0.06] transition-colors truncate"
+                  title={`${tr.subject}: ${tr.title} (${tr.date})`}
+                >
+                  <span className="chip chip-accent text-[10px] mr-1.5">{tr.subject}</span>
+                  {tr.title}
+                </button>
+              ))}
+              {tlDue.length > 3 && (
+                <p className="text-[10px] text-[hsl(var(--fg-subtle))] px-2">+{tlDue.length - 3} more</p>
+              )}
+            </div>
+          </div>
+        )}
         <button
           onClick={() => navigate("/solve/repository?filter=revisit_today")}
-          className="group text-left p-2 -m-2 rounded hover:bg-[hsl(var(--accent))]/[0.08] transition-colors"
+          className="group text-left p-2 -m-2 rounded hover:bg-[hsl(var(--accent))]/[0.08] transition-colors block w-full"
         >
           <div className="flex items-center gap-1">
             <span className="text-3xl font-semibold mono">{dueRevisits}</span>

@@ -25,9 +25,20 @@ export default function Layout() {
   const isSolve = loc.pathname.startsWith("/solve");
   const isMac = typeof navigator !== "undefined" && navigator.platform?.toLowerCase().includes("mac");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [cmdHint, setCmdHint] = useState(false);
   const { theme, toggle } = useTheme();
 
   const closeMobile = () => setMobileOpen(false);
+
+  useEffect(() => {
+    const seen = localStorage.getItem("byop.cmdk_hint_seen");
+    if (!seen) setCmdHint(true);
+  }, []);
+
+  const dismissCmdHint = () => {
+    localStorage.setItem("byop.cmdk_hint_seen", "1");
+    setCmdHint(false);
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -143,6 +154,14 @@ export default function Layout() {
       </header>
 
       <main className="flex-1 px-3 sm:px-5 py-4 sm:py-5 max-w-[1400px] w-full mx-auto">
+        {cmdHint && (
+          <div className="mb-4 card-2-accent px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
+            <span className="text-[hsl(var(--fg-muted))]">
+              Press <kbd className="px-1.5 py-0.5 bg-[hsl(var(--bg-elev-2))] border border-border rounded text-xs mono">{isMac ? "⌘K" : "Ctrl+K"}</kbd> to search, navigate, or jump to practice
+            </span>
+            <button onClick={dismissCmdHint} className="btn-ghost p-1 text-[hsl(var(--fg-subtle))] hover:text-[hsl(var(--fg))]" title="Dismiss"><X className="w-3.5 h-3.5" /></button>
+          </div>
+        )}
         <Outlet />
       </main>
 

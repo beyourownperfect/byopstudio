@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, Plus, Star, Trash2, Edit3, Play, Upload, Download, ExternalLink, X, ArrowUp, ArrowDown, ArrowUpDown, FileText } from "lucide-react";
 import Papa from "papaparse";
 import { questionsApi, seed } from "@/lib/api";
-import { SUBJECTS, TID } from "@/lib/constants";
+import { SUBJECTS, SUBJECT_LABELS, TID } from "@/lib/constants";
+import SubjectSelect from "@/components/SubjectSelect";
 import { debounce, relLabel, relDays } from "@/lib/dateUtils";
 import QuestionFormModal from "@/components/QuestionFormModal";
 import QuestionDetailsModal from "@/components/QuestionDetailsModal";
@@ -268,10 +269,7 @@ export default function Repository() {
             className="input pl-8"
           />
         </div>
-        <select data-testid={TID.repoSubjectFilter} value={subject} onChange={(e) => setSubject(e.target.value)} className="input max-w-[140px]">
-          <option value="ALL">All subjects</option>
-          {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+        <SubjectSelect data-testid={TID.repoSubjectFilter} value={subject} onChange={(e) => setSubject(e.target.value)} className="input max-w-[220px]" allOption />
         <select data-testid={TID.repoFilterMode} value={filterMode} onChange={(e) => setFilterMode(e.target.value)} className="input max-w-[180px]">
           {FILTER_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
@@ -375,7 +373,7 @@ function RepoRow({ q, selected, search, onToggle, onBookmark, onEdit, onDelete, 
       <input data-testid={TID.repoRowCheckbox(q.id)} type="checkbox" checked={selected} onChange={onToggle} data-no-dbl className="accent-[hsl(var(--accent))]" />
 
       {/* Subject badge - slightly stronger */}
-      <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold rounded border border-[hsl(var(--accent))]/40 bg-[hsl(var(--accent))]/10 text-[hsl(var(--accent))]">
+      <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold rounded border border-[hsl(var(--accent))]/40 bg-[hsl(var(--accent))]/10 text-[hsl(var(--accent))]" title={SUBJECT_LABELS[q.subject]}>
         {q.subject}
       </span>
 

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import Modal from "@/components/Modal";
 import RevisitMenu from "@/components/RevisitMenu";
+import SubjectSelect from "@/components/SubjectSelect";
 import { Trash2, Check, CalendarPlus, Clock } from "lucide-react";
 import { timelineApi } from "@/lib/api";
-import { SUBJECTS, ACTIVITIES, REVISIT_PRESETS, TID } from "@/lib/constants";
+import { ACTIVITIES, REVISIT_PRESETS, TID } from "@/lib/constants";
 import { todayISO, fmtDate, fmtDuration, isoAdd, relLabel } from "@/lib/dateUtils";
 
 const empty = {
@@ -78,9 +79,7 @@ export default function TimelineEntryModal({ open, onClose, entry, onSaved }) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div><label className="label-x">Date</label><input type="date" value={form.date} onChange={(e) => set("date", e.target.value)} className="input mt-1" /></div>
           <div><label className="label-x">Subject</label>
-            <select value={form.subject} onChange={(e) => set("subject", e.target.value)} className="input mt-1">
-              {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <SubjectSelect value={form.subject} onChange={(e) => set("subject", e.target.value)} className="input mt-1" />
           </div>
           <div><label className="label-x">Activity</label>
             <select value={form.activity} onChange={(e) => set("activity", e.target.value)} className="input mt-1">
@@ -113,7 +112,7 @@ export default function TimelineEntryModal({ open, onClose, entry, onSaved }) {
         {isEdit && (
           <div className="border-t border-border pt-3 space-y-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="label-x flex items-center gap-1.5"><CalendarPlus className="w-3 h-3" /> Schedule revisions</div>
+              <div className="label-x flex items-center gap-1.5"><CalendarPlus className="w-3 h-3" /> Schedule revisions <span className="text-[hsl(var(--fg-subtle))] lowercase font-normal">(SRS)</span></div>
               <div className="flex flex-wrap gap-1.5">
                 {REVISIT_PRESETS.map((p) => (
                   <button key={p.days} data-testid={TID.tlScheduleRev(p.days)} onClick={() => scheduleRev(p.days)} className="btn text-xs">+{p.days}d</button>

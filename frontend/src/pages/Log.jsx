@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Trash2, Clock, ChevronDown, CheckCircle, X as XIcon } from "lucide-react";
 import { logsApi, subjectCompletionApi } from "@/lib/api";
-import { SUBJECTS, ACTIVITIES, TID } from "@/lib/constants";
+import { SUBJECTS, SUBJECT_LABELS, ACTIVITIES, TID } from "@/lib/constants";
 import { todayISO, fmtDate, fmtDuration, isoAdd } from "@/lib/dateUtils";
 import Modal from "@/components/Modal";
 import HelpButton from "@/components/HelpButton";
 import LectureTable from "@/components/LectureTable";
+import SubjectSelect from "@/components/SubjectSelect";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
 const emptyForm = {
@@ -235,9 +236,9 @@ export default function Log() {
         {completionExpanded && (
           <div className="border-t-2 border-border">
             <div className="px-4 py-2.5">
-              <select value={completionSubject} onChange={(e) => { setCompletionSubject(e.target.value); loadCompletions(e.target.value !== "ALL" ? e.target.value : null); }} className="input max-w-[160px] text-xs">
+              <select value={completionSubject} onChange={(e) => { setCompletionSubject(e.target.value); loadCompletions(e.target.value !== "ALL" ? e.target.value : null); }} className="input max-w-[200px] text-xs">
                 <option value="ALL">All subjects</option>
-                {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+                {SUBJECTS.map((s) => <option key={s} value={s}>{s} — {SUBJECT_LABELS[s]}</option>)}
               </select>
             </div>
             <CompletionTable
@@ -337,7 +338,7 @@ export default function Log() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className="label-x">Activity</label><select data-testid={TID.logFormActivity} value={form.activity} onChange={(e) => setForm({ ...form, activity: e.target.value })} className="input mt-1">{ACTIVITIES.map((a) => <option key={a} value={a}>{a}</option>)}</select></div>
-            <div><label className="label-x">Subject</label><select data-testid={TID.logFormSubject} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="input mt-1">{SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
+            <div><label className="label-x">Subject</label><SubjectSelect data-testid={TID.logFormSubject} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="input mt-1" /></div>
           </div>
           <div><label className="label-x">Topic</label><input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} className="input mt-1" placeholder="e.g. Trees" /></div>
           {form.activity === "Practice" && (
@@ -387,7 +388,7 @@ function CompletionTable({ completions, subjectFilter, onToggle, onExplain, subj
         <p className="text-xs text-[hsl(var(--fg-muted))]">No completion checklists yet. Create one for a subject to start tracking.</p>
         <div className="flex flex-wrap gap-2">
           {subjOptions.map((s) => (
-            <button key={s} onClick={() => onCreateCompletion(s)} className="btn text-xs"><Plus className="w-3 h-3" /> {s}</button>
+            <button key={s} onClick={() => onCreateCompletion(s)} className="btn text-xs" title={SUBJECT_LABELS[s]}><Plus className="w-3 h-3" /> {s}</button>
           ))}
         </div>
       </div>
@@ -449,7 +450,7 @@ function CompletionTable({ completions, subjectFilter, onToggle, onExplain, subj
         <div className="px-4 py-3 flex flex-wrap gap-1.5 items-center">
           <span className="text-[10px] text-[hsl(var(--fg-subtle))] mr-1">Add:</span>
           {subjOptions.filter((s) => !existingSubjects.has(s)).map((s) => (
-            <button key={s} onClick={() => onCreateCompletion(s)} className="text-[11px] px-2 py-0.5 rounded border border-border hover:border-[hsl(var(--accent))] transition-colors text-[hsl(var(--fg-muted))] hover:text-[hsl(var(--fg))]">{s}</button>
+            <button key={s} onClick={() => onCreateCompletion(s)} className="text-[11px] px-2 py-0.5 rounded border border-border hover:border-[hsl(var(--accent))] transition-colors text-[hsl(var(--fg-muted))] hover:text-[hsl(var(--fg))]" title={SUBJECT_LABELS[s]}>{s}</button>
           ))}
         </div>
       )}

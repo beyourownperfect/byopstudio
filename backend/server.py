@@ -750,6 +750,35 @@ async def submit_practice(payload: Dict[str, Any]):
         doc["auto"] = True
         await db.study_logs.insert_one(doc)
 
+    # Upsert daily practice timeline entry (aggregate per subject per day)
+    tl_date = today_iso()
+    existing_tl = await db.timeline.find_one(
+        {"date": tl_date, "subject": q["subject"], "activity": "Practice"}, {"_id": 0}
+    )
+    if existing_tl:
+        await db.timeline.update_one(
+            {"id": existing_tl["id"]},
+            {
+                "$inc": {
+                    "questions_solved": 1,
+                    "duration_min": max(1, time_taken // 60),
+                },
+                "$set": {"completion_status": "completed"},
+            },
+        )
+    else:
+        tl = TimelineEntry(
+            subject=q["subject"],
+            topic="",
+            activity="Practice",
+            title=f"Practice — {q['subject']}",
+            duration_min=max(1, time_taken // 60),
+            questions_solved=1,
+            date=tl_date,
+            completion_status="completed",
+        )
+        await db.timeline.insert_one(tl.model_dump())
+
     updated_srs = await db.srs.find_one({"question_id": qid}, {"_id": 0})
     return {
         "attempt": attempt.model_dump(),
@@ -789,6 +818,27 @@ async def create_log(payload: Dict[str, Any]):
     payload.setdefault("date", today_iso())
     log = StudyLog(**{k: v for k, v in payload.items() if k in StudyLog.model_fields})
     await db.study_logs.insert_one(log.model_dump())
+
+    # Auto-bridge to timeline: every orphan log (no timeline_entry_id) creates
+    # a matching timeline entry so study activity renders on the calendar.
+    if not log.timeline_entry_id:
+        tl = TimelineEntry(
+            subject=log.subject,
+            topic=log.topic,
+            activity=log.activity,
+            title=log.remarks or f"{log.activity} — {log.subject}",
+            duration_min=log.duration_min,
+            questions_solved=log.questions_attempted,
+            notes=log.remarks,
+            date=log.date,
+            completion_status="completed",
+        )
+        await db.timeline.insert_one(tl.model_dump())
+        await db.study_logs.update_one(
+            {"id": log.id}, {"$set": {"timeline_entry_id": tl.id}}
+        )
+        return {**log.model_dump(), "timeline_entry_id": tl.id}
+
     return log
 
 
@@ -1052,7 +1102,31 @@ async def complete_revisit(rid: str):
     )
     if not res:
         raise HTTPException(404)
-    return strip_id(res)
+
+    # Auto-log revisit completion so it shows in log + timeline
+    rv = strip_id(res)
+    log = StudyLog(
+        activity="Revision",
+        subject=rv.get("item_subject") or "",
+        topic="",
+        duration_min=0,
+        remarks=f"Revisit: {rv.get('item_title', '')}",
+    )
+    await db.study_logs.insert_one(log.model_dump())
+
+    # Also create a timeline entry for this completed revisit
+    tl = TimelineEntry(
+        subject=rv.get("item_subject") or "",
+        topic="",
+        activity="Revision",
+        title=f"Revisit: {rv.get('item_title', '')}",
+        duration_min=0,
+        date=today_iso(),
+        completion_status="completed",
+    )
+    await db.timeline.insert_one(tl.model_dump())
+
+    return rv
 
 
 @api_router.delete("/revisits/{rid}")
@@ -1153,11 +1227,18 @@ async def pulse():
         {"scheduled_revisions": {"$exists": True, "$ne": []}}, {"_id": 0}
     ).to_list(5000)
     due_timeline_revs = 0
+    due_timeline_revs_list = []
     for tle in timeline_with_sched:
         completed = set(tle.get("completed_revisions", []))
         for rd in tle.get("scheduled_revisions", []):
             if rd <= today and rd not in completed:
                 due_timeline_revs += 1
+                due_timeline_revs_list.append({
+                    "date": rd,
+                    "subject": tle["subject"],
+                    "title": tle["title"],
+                    "entry_id": tle["id"],
+                })
     due_revisions_total = due_srs + due_timeline_revs
     # Due revisits
     due_revisits = await db.revisits.count_documents(
@@ -1392,6 +1473,7 @@ async def pulse():
         "due_revisions": due_revisions_total,
         "due_srs": due_srs,
         "due_timeline_revisions": due_timeline_revs,
+        "due_timeline_revisions_list": due_timeline_revs_list,
         "due_revisits": due_revisits,
         "weak_topics": weak_topics,
         "subject_completion": subject_completion,
@@ -1487,6 +1569,122 @@ async def reorder_user_missions(payload: Dict[str, List[str]]):
             {"$set": {"order": idx, "updated_at": now_iso()}},
         )
     return {"reordered": len(ids)}
+
+
+# ============================ EXECUTION QUEUE =======================
+@api_router.get("/queue")
+async def execution_queue():
+    """Aggregate SRS revisions, timeline scheduled revisions, revisits, and
+    user missions into a single prioritized execution queue.
+
+    Groups: overdue, today, this_week, upcoming.
+    Each item carries enough context to deep-link back to its owning module.
+    """
+    today = today_iso()
+    dt = date.today()
+    week_end = (dt + timedelta(days=(6 - dt.weekday()))).isoformat()
+
+    items = []
+
+    # ── SRS revisions ──
+    due_srs = (
+        await db.srs.find({"next_review_date": {"$lte": week_end}}, {"_id": 0})
+        .sort("next_review_date", 1)
+        .to_list(500)
+    )
+    if due_srs:
+        qids = [s["question_id"] for s in due_srs]
+        qs = await db.questions.find({"id": {"$in": qids}}, {"_id": 0, "id": 1, "subject": 1, "topic": 1, "statement": 1, "question_type": 1}).to_list(500)
+        qmap = {q["id"]: q for q in qs}
+        for s in due_srs:
+            q = qmap.get(s["question_id"])
+            if not q:
+                continue
+            items.append({
+                "id": f"srs-{s['id']}",
+                "kind": "srs",
+                "subject": q.get("subject", ""),
+                "topic": q.get("topic", ""),
+                "title": (q.get("statement", "") or "")[:100],
+                "due_date": s["next_review_date"],
+                "link": f"/solve/practice?mode=due&subject={q.get('subject', '')}",
+                "meta": f"SRS · {q.get('question_type', '')}",
+            })
+
+    # ── Timeline scheduled revisions ──
+    tl_with_sched = await db.timeline.find(
+        {"scheduled_revisions": {"$exists": True, "$ne": []}}, {"_id": 0}
+    ).to_list(2000)
+    for tle in tl_with_sched:
+        completed = set(tle.get("completed_revisions", []))
+        for rd in tle.get("scheduled_revisions", []):
+            if rd > week_end or rd in completed:
+                continue
+            items.append({
+                "id": f"tlrev-{tle['id']}-{rd}",
+                "kind": "timeline_revision",
+                "subject": tle.get("subject", ""),
+                "title": f"Revise: {tle['title']}",
+                "due_date": rd,
+                "link": f"/timeline?view=daily",
+                "meta": "Timeline revision",
+            })
+
+    # ── Revisit items ──
+    revisit_items = (
+        await db.revisits.find(
+            {"completed": False, "revisit_date": {"$lte": week_end}}, {"_id": 0}
+        )
+        .sort("revisit_date", 1)
+        .to_list(200)
+    )
+    for rv in revisit_items:
+        items.append({
+            "id": f"revisit-{rv['id']}",
+            "kind": "revisit",
+            "subject": rv.get("item_subject") or "",
+            "title": rv.get("item_title", "Revisit item"),
+            "due_date": rv["revisit_date"],
+            "link": "/solve/repository?filter=revisit_today",
+            "meta": rv.get("item_type", "Revisit"),
+        })
+
+    # ── Incomplete user missions ──
+    missions = (
+        await db.user_missions.find({"completed": False}, {"_id": 0})
+        .sort([("order", 1), ("created_at", 1)])
+        .to_list(50)
+    )
+    for m in missions:
+        items.append({
+            "id": f"mission-{m['id']}",
+            "kind": "mission",
+            "subject": "",
+            "title": m["title"],
+            "due_date": today,
+            "link": "/pulse",
+            "meta": "Your task",
+        })
+
+    # ── Sort by date, then prioritize overdue over future ──
+    items.sort(key=lambda x: (x["due_date"] != today and x["due_date"], x["due_date"]))
+
+    # ── Group ──
+    groups = {"overdue": [], "today": [], "this_week": [], "upcoming": []}
+    for it in items:
+        if it["due_date"] < today:
+            groups["overdue"].append(it)
+        elif it["due_date"] == today:
+            groups["today"].append(it)
+        elif it["due_date"] <= week_end:
+            groups["this_week"].append(it)
+        else:
+            groups["upcoming"].append(it)
+
+    return {
+        "groups": groups,
+        "total": sum(len(v) for v in groups.values()),
+    }
 
 
 # ============================ MISTAKES BANK ========================

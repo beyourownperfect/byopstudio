@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Play, Pause, RotateCcw, Maximize2, X, Save } from "lucide-react";
 import { logsApi } from "@/lib/api";
-import { SUBJECTS, ACTIVITIES } from "@/lib/constants";
+import { ACTIVITIES } from "@/lib/constants";
 import { todayISO } from "@/lib/dateUtils";
+import SubjectSelect from "@/components/SubjectSelect";
 
 const STOPWATCH_COLOR = "hsl(170 70% 45%)";
 const STOPWATCH_RUN_COLOR = "hsl(170 85% 55%)";
@@ -217,12 +218,10 @@ export default function StudyTimer() {
         )}
 
         {/* Subject picker */}
-        <select value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
+        <SubjectSelect value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
           className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-1.5 py-0.5 text-[10px] outline-none focus:border-[hsl(var(--accent))]"
           title="Subject for auto-log"
-        >
-          {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+        />
 
         {/* Topic input */}
         <input
@@ -373,11 +372,9 @@ export default function StudyTimer() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="text-left">
                   <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Subject</label>
-                  <select value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
+                  <SubjectSelect value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
                     className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
-                  >
-                    {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  />
                 </div>
                 <div className="text-left">
                   <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Activity</label>

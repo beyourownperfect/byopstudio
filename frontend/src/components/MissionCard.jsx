@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  Target, Plus, Check, Trash2, GripVertical,
+  CheckSquare, Plus, Check, Trash2, GripVertical,
   Pencil, X as XIcon,
 } from "lucide-react";
 import { userMissionsApi } from "@/lib/api";
@@ -70,7 +70,7 @@ export default function MissionCard() {
     <div className="card-2 p-5" data-testid="pulse-mission-card">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <Target className="w-4 h-4 text-[hsl(var(--accent))]" />
+          <CheckSquare className="w-4 h-4 text-[hsl(var(--accent))]" />
           <h2 className="font-semibold">Today&apos;s Mission</h2>
         </div>
         <span className="text-[10px] uppercase tracking-wider text-[hsl(var(--fg-subtle))]">

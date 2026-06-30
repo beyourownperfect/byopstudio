@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, ChevronLeft, ChevronRight, Calendar as CalIcon } from "lucide-react";
 import { timelineApi, calendarApi, revisitsApi } from "@/lib/api";
 import { TID } from "@/lib/constants";
@@ -10,7 +11,10 @@ import { HELP_CONTENT } from "@/lib/helpContent";
 const VIEWS = ["daily", "weekly", "monthly"];
 
 export default function Timeline() {
-  const [view, setView] = useState("monthly");
+  const [searchParams] = useSearchParams();
+  const urlView = searchParams.get("view");
+  const initialView = urlView && VIEWS.includes(urlView) ? urlView : "monthly";
+  const [view, setView] = useState(initialView);
   const [cursor, setCursor] = useState(new Date()); // current focus date
   const [entries, setEntries] = useState([]);
   const [scheduledRev, setScheduledRev] = useState([]);
