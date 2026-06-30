@@ -15,7 +15,7 @@ const empty = {
 
 /* ── OCR section parser ── */
 
-const SECTION_RE = /^#{1,3}\s*(question|options|custom options|correct answer|explanation)\s*$/i;
+const SECTION_RE = /^#{1,3}\s*(question|options|custom options|correct answer|explanation|subject|type|exam\s*\/?\s*source|source|year)\s*$/i;
 
 function guessTypeFromOptions(opts) {
   const lines = opts.filter((o) => o.trim() !== "");
@@ -192,6 +192,56 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
       updated.explanation = sections.explanation;
       filled++;
     }
+    if (sections.subject) {
+      const rawSubj = sections.subject.trim().toUpperCase();
+      const subjectMap = {
+        "C": "C", "PROGRAMMING": "C", "C PROGRAMMING": "C",
+        "DS": "DS", "DATA STRUCTURES": "DS", "DATA STRUCTURE": "DS",
+        "AL": "AL", "ALGORITHMS": "AL", "DAA": "AL", "DESIGN AND ANALYSIS": "AL",
+        "OS": "OS", "OPERATING SYSTEM": "OS", "OPERATING SYSTEMS": "OS",
+        "DB": "DB", "DBMS": "DB", "DATABASE": "DB", "DATABASES": "DB", "DATABASE MANAGEMENT": "DB",
+        "COA": "COA", "COMPUTER ORGANIZATION": "COA", "COMPUTER ARCHITECTURE": "COA", "COMPUTER ORGANIZATION AND ARCHITECTURE": "COA",
+        "TOC": "TOC", "THEORY OF COMPUTATION": "TOC", "THEORY OF COMPUTE": "TOC", "AUTOMATA": "TOC",
+        "CD": "CD", "COMPILER DESIGN": "CD", "COMPILERS": "CD", "COMPILER": "CD",
+        "DL": "DL", "DIGITAL LOGIC": "DL", "DIGITAL ELECTRONICS": "DL", "DIGITAL": "DL",
+        "EM": "EM", "ENGINEERING MATH": "EM", "ENGINEERING MATHEMATICS": "EM", "ENG MATHS": "EM",
+        "DM": "DM", "DISCRETE MATH": "DM", "DISCRETE MATHEMATICS": "DM", "DISCRETE MATHS": "DM",
+        "CN": "CN", "COMPUTER NETWORKS": "CN", "COMPUTER NETWORK": "CN", "NETWORKING": "CN", "NETWORKS": "CN",
+      };
+      const matched = subjectMap[rawSubj];
+      if (matched) {
+        updated.subject = matched;
+        filled++;
+      } else if (rawSubj) {
+        updated.subject = rawSubj;
+        filled++;
+      }
+    }
+    if (sections.type) {
+      const t = sections.type.trim().toUpperCase();
+      if (["MCQ", "MSQ", "NAT"].includes(t)) {
+        updated.question_type = t;
+        filled++;
+      }
+    }
+    if (sections.exam_source || sections.source) {
+      const src = (sections.exam_source || sections.source).trim();
+      const knownKey = EXAM_SOURCES.find((es) => es.toUpperCase() === src.toUpperCase());
+      if (knownKey) {
+        updated.exam_source = knownKey;
+      } else {
+        updated.exam_source = "Other";
+        updated.exam_source_other = src;
+      }
+      filled++;
+    }
+    if (sections.year) {
+      const y = parseInt(sections.year.trim());
+      if (!isNaN(y) && y >= 1990 && y <= 2030) {
+        updated.year = y;
+        filled++;
+      }
+    }
 
     setForm(updated);
     if (filled > 0) show(`Filled ${filled} field${filled !== 1 ? "s" : ""}`, "success");
@@ -233,7 +283,7 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
             value={ocrText}
             onChange={(e) => setOcrText(e.target.value)}
             className="input min-h-[80px] text-xs mono"
-            placeholder={`## Question\nWhat is the time complexity of binary search?\n\n## Options\nA) O(1)\nB) O(log n)\nC) O(n)\nD) O(n log n)\n\n## Correct Answer\nB\n\n## Explanation\nBinary search halves the search space each iteration.`}
+            placeholder={`## Question\nWhat is the time complexity of binary search?\n\n## Options\nA) O(1)\nB) O(log n)\nC) O(n)\nD) O(n log n)\n\n## Correct Answer\nB\n\n## Explanation\nBinary search halves the search space each iteration.\n\n## Subject\nDS\n\n## Type\nMCQ\n\n## Exam / Source\nGATE\n\n## Year\n2024`}
           />
           <button type="button" onClick={autoFill} className="btn text-xs flex items-center gap-1.5">
             <Wand2 className="w-3.5 h-3.5" /> Auto Fill

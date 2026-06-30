@@ -239,9 +239,9 @@ export default function Log() {
   }, {});
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="card-2 px-4 sm:px-5 py-3 sm:py-4 space-y-2.5">
+      <div className="card-2 px-4 sm:px-5 py-3 sm:py-4 space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <div>
@@ -256,31 +256,26 @@ export default function Log() {
             setOpen(true);
           }} className="btn btn-primary text-xs"><Plus className="w-3.5 h-3.5" /> Log session</button>
         </div>
-        <div className="card-1 p-0.5 flex items-center gap-3 text-xs self-start">
-          {["daily", "weekly", "monthly"].map((v) => (
-            <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded transition-colors ${view === v ? "bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg))]" : "text-[hsl(var(--fg-muted))]"}`}>
-              {v}
-            </button>
-          ))}
-          <span className="w-px h-4 bg-border" />
-          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="bg-transparent text-[11px] outline-none">
-            <option value="All">All categories</option>
-            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* Live timer status — bridged from PULSE */}
-      <div className="card-2 p-3 flex items-center justify-between flex-wrap gap-3 text-sm">
-        <div className="flex items-center gap-3 min-w-0">
-          <Clock className="w-4 h-4 text-[hsl(var(--accent))] shrink-0" />
-          <span className="text-[hsl(var(--fg-muted))] truncate">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="card-1 p-0.5 flex items-center gap-3 text-xs self-start">
+            {["daily", "weekly", "monthly"].map((v) => (
+              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded transition-colors ${view === v ? "bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg))]" : "text-[hsl(var(--fg-muted))]"}`}>
+                {v}
+              </button>
+            ))}
+            <span className="w-px h-4 bg-border" />
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="bg-transparent text-[11px] outline-none">
+              <option value="All">All categories</option>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          {/* Live timer status — inline banner */}
+          <span className="text-[11px] text-[hsl(var(--fg-muted))] flex items-center gap-1.5">
+            <Clock className="w-3 h-3 text-[hsl(var(--accent))] shrink-0" />
             {getTimerStatusText(timerState) || "Study timer lives on"}
+            <Link to="/pulse" className="text-[hsl(var(--accent))] hover:underline ml-1">Pulse →</Link>
           </span>
         </div>
-        <Link to="/pulse" className="text-[hsl(var(--accent))] font-medium hover:underline whitespace-nowrap text-xs">
-          Pulse &rarr;
-        </Link>
       </div>
 
       {/* Session summary */}

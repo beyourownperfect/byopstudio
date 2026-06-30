@@ -191,106 +191,110 @@ export default function StudyTimer() {
 
   return (
     <div className="relative">
-      {/* ── Inline compact timer bar ── */}
-      <div className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-[hsl(var(--bg-elev))] px-3 py-1.5">
-        {/* Mode tabs */}
-        <div className="flex rounded-md bg-[hsl(var(--bg-elev-2))] p-0.5">
-          <button
-            onClick={() => switchMode("stopwatch")}
-            className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-all ${
-              mode === "stopwatch" ? "bg-[#2dd4bf]/20 text-[#2dd4bf]" : "text-[hsl(var(--fg-muted))]"
-            }`}
-          >
-            Stopwatch
-          </button>
-          <button
-            onClick={() => switchMode("countdown")}
-            className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-all ${
-              mode === "countdown" ? "bg-[hsl(var(--accent))]/20 text-[hsl(var(--accent))]" : "text-[hsl(var(--fg-muted))]"
-            }`}
-          >
-            Countdown
-          </button>
-        </div>
-
-        {/* Countdown setup (only when stopped) */}
-        {mode === "countdown" && !running && (
-          <div className="flex items-center gap-1">
-            <input
-              type="number" min="1" max="999"
-              value={countdownMins}
-              onChange={(e) => setCountdownMins(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-10 px-1 py-0.5 text-[11px] text-center bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] mono"
-            />
-            <span className="text-[10px] text-[hsl(var(--fg-muted))]">m</span>
-            <input
-              type="number" min="0" max="59"
-              value={countdownSecs}
-              onChange={(e) => setCountdownSecs(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
-              className="w-10 px-1 py-0.5 text-[11px] text-center bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] mono"
-            />
-            <span className="text-[10px] text-[hsl(var(--fg-muted))]">s</span>
+      {/* ── Responsive timer bar ── */}
+      <div className="rounded-lg border border-border bg-[hsl(var(--bg-elev))] px-3 py-2 sm:py-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Mode tabs */}
+          <div className="flex rounded-md bg-[hsl(var(--bg-elev-2))] p-0.5 shrink-0">
+            <button
+              onClick={() => switchMode("stopwatch")}
+              className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-all ${
+                mode === "stopwatch" ? "bg-[#2dd4bf]/20 text-[#2dd4bf]" : "text-[hsl(var(--fg-muted))]"
+              }`}
+            >
+              Stopwatch
+            </button>
+            <button
+              onClick={() => switchMode("countdown")}
+              className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-all ${
+                mode === "countdown" ? "bg-[hsl(var(--accent))]/20 text-[hsl(var(--accent))]" : "text-[hsl(var(--fg-muted))]"
+              }`}
+            >
+              Countdown
+            </button>
           </div>
-        )}
 
-        {/* Subject picker (GATE only) */}
-        {isGate && (
-          <SubjectSelect value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
-            className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-1.5 py-0.5 text-[10px] outline-none focus:border-[hsl(var(--accent))]"
-            title="Subject for auto-log"
-          />
-        )}
+          {/* Time display + controls row */}
+          <div className="flex items-center gap-1 ml-auto sm:ml-0 sm:order-2">
+            <span
+              className={`mono font-bold text-lg tabular-nums tracking-wider transition-colors ${
+                isUrgent ? "text-[hsl(var(--danger))] animate-pulse" : ""
+              }`}
+              style={{ color: !isUrgent ? color : undefined, minWidth: mode === "stopwatch" ? "55px" : "60px", textAlign: "center" }}
+            >
+              {formatTime(display)}
+            </span>
+            <button onClick={toggle} className="btn-ghost p-1" title={running ? "Pause" : "Start"}>
+              {running ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            </button>
+            <button onClick={reset} className="btn-ghost p-1" title="Reset">
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+            <span className="w-px h-5 bg-border mx-0.5" />
+            <button onClick={completeSession} className="btn-ghost p-1 text-[hsl(var(--success))]" title="Complete Session" disabled={display <= 0}>
+              <Save className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => setFocusOpen(true)} className="btn-ghost p-1" title="Focus mode">
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-        {/* Topic input (GATE only) */}
-        {isGate && (
-          <input
-            value={timerTopic}
-            onChange={(e) => setTimerTopic(e.target.value)}
-            placeholder="topic"
-            className="w-[72px] px-1.5 py-0.5 text-[10px] bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] placeholder:text-[hsl(var(--fg-subtle))]/50"
-            title="Topic (saved to log)"
-          />
-        )}
+          {/* Fields row — full width on mobile */}
+          <div className="w-full sm:w-auto flex flex-wrap items-center gap-1 sm:gap-1.5 order-3">
+            {/* Countdown setup (only when stopped) */}
+            {mode === "countdown" && !running && (
+              <div className="flex items-center gap-0.5">
+                <input
+                  type="number" min="1" max="999"
+                  value={countdownMins}
+                  onChange={(e) => setCountdownMins(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-10 px-1 py-0.5 text-[11px] text-center bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] mono"
+                />
+                <span className="text-[10px] text-[hsl(var(--fg-muted))]">m</span>
+                <input
+                  type="number" min="0" max="59"
+                  value={countdownSecs}
+                  onChange={(e) => setCountdownSecs(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="w-10 px-1 py-0.5 text-[11px] text-center bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] mono"
+                />
+                <span className="text-[10px] text-[hsl(var(--fg-muted))]">s</span>
+              </div>
+            )}
 
-        {/* Category selector */}
-        <select
-          value={timerCategory}
-          onChange={(e) => {
-            const v = e.target.value;
-            setTimerCategory(v);
-            try { localStorage.setItem("byop.studyCategory", v); } catch {}
-          }}
-          className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-1 py-0.5 text-[9px] outline-none focus:border-[hsl(var(--accent))] max-w-[72px]"
-          title="Category"
-        >
-          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+            {/* Subject picker (GATE only) */}
+            {isGate && (
+              <SubjectSelect value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
+                className="w-[68px] sm:w-auto bg-[hsl(var(--bg-elev-2))] border border-border rounded px-1.5 py-0.5 text-[10px] outline-none focus:border-[hsl(var(--accent))]"
+                title="Subject for auto-log"
+              />
+            )}
 
-        {/* Time display */}
-        <span
-          className={`mono font-bold text-lg tabular-nums tracking-wider transition-colors ${
-            isUrgent ? "text-[hsl(var(--danger))] animate-pulse" : ""
-          }`}
-          style={{ color: !isUrgent ? color : undefined, minWidth: mode === "stopwatch" ? "55px" : "60px", textAlign: "center" }}
-        >
-          {formatTime(display)}
-        </span>
+            {/* Topic input (GATE only) */}
+            {isGate && (
+              <input
+                value={timerTopic}
+                onChange={(e) => setTimerTopic(e.target.value)}
+                placeholder="topic"
+                className="w-[60px] sm:w-[72px] px-1.5 py-0.5 text-[10px] bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] placeholder:text-[hsl(var(--fg-subtle))]/50"
+                title="Topic (saved to log)"
+              />
+            )}
 
-        {/* Controls */}
-        <button onClick={toggle} className="btn-ghost p-1" title={running ? "Pause" : "Start"}>
-          {running ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-        </button>
-        <button onClick={reset} className="btn-ghost p-1" title="Reset">
-          <RotateCcw className="w-3.5 h-3.5" />
-        </button>
-
-        <span className="w-px h-5 bg-border mx-0.5" />
-        <button onClick={completeSession} className="btn-ghost p-1 text-[hsl(var(--success))]" title="Complete Session" disabled={display <= 0}>
-          <Save className="w-3.5 h-3.5" />
-        </button>
-        <button onClick={() => setFocusOpen(true)} className="btn-ghost p-1" title="Focus mode">
-          <Maximize2 className="w-3.5 h-3.5" />
-        </button>
+            {/* Category selector */}
+            <select
+              value={timerCategory}
+              onChange={(e) => {
+                const v = e.target.value;
+                setTimerCategory(v);
+                try { localStorage.setItem("byop.studyCategory", v); } catch {}
+              }}
+              className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-1 py-0.5 text-[9px] outline-none focus:border-[hsl(var(--accent))] max-w-[72px] sm:max-w-[80px]"
+              title="Category"
+            >
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
 
         {/* Saved toast */}
         {savedToast && !focusOpen && (

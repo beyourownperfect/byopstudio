@@ -74,7 +74,7 @@ export default function QueueCard() {
         <span className="chip mono text-[11px]">{queue.total} items</span>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-1 max-h-[280px] overflow-y-auto">
         {Object.entries(GROUP_LABELS).map(([key, g]) => {
           const items = queue.groups[key] || [];
           if (items.length === 0) return null;

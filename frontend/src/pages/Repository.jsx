@@ -236,13 +236,13 @@ export default function Repository() {
   }, [subject, filterMode, officialTopic, setSp]);
 
   return (
-    <div className="space-y-6">
-      <div className="card-2 px-4 sm:px-5 py-3 sm:py-4 space-y-3">
+    <div className="space-y-4">
+      <div className="card-2 px-4 sm:px-5 py-3 sm:py-4 space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <div>
               <h1 className="text-xl font-semibold">Repository</h1>
-              <p className="text-xs text-[hsl(var(--fg-muted))]">Single source of truth · {sortedItems.length} questions</p>
+              <p className="text-xs text-[hsl(var(--fg-muted))]">{sortedItems.length} questions</p>
             </div>
             <HelpButton moduleKey="repository" title={HELP_CONTENT.repository.title} sections={HELP_CONTENT.repository.sections} />
           </div>
@@ -250,18 +250,18 @@ export default function Repository() {
             <Plus className="w-3.5 h-3.5" /> New
           </button>
         </div>
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button onClick={() => setOcrOpen(true)} className="btn btn-ghost text-xs" data-testid="repo-ocr-btn" title="Copy OCR prompt for AI">
             <FileText className="w-3.5 h-3.5" /> <span className="hidden sm:inline">OCR</span>
           </button>
-          <label className="btn cursor-pointer text-xs" data-testid={TID.repoImportCsv}>
+          <label className="btn-ghost cursor-pointer text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors" data-testid={TID.repoImportCsv}>
             <Upload className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Import CSV</span>
             <input type="file" accept=".csv" onChange={onImport} className="hidden" />
           </label>
-          <button onClick={() => setImportGuideOpen(true)} className="btn btn-ghost p-1.5" title="CSV import guide">
+          <button onClick={() => setImportGuideOpen(true)} className="btn-ghost p-1.5" title="CSV import guide">
             <HelpCircle className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onExport} className="btn text-xs" data-testid={TID.repoExportCsv}>
+          <button onClick={onExport} className="btn-ghost text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors" data-testid={TID.repoExportCsv}>
             <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Export CSV</span>
           </button>
           <button onClick={startNew} className="btn btn-primary hidden sm:inline-flex" data-testid={TID.repoNewBtn}>

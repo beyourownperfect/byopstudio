@@ -1,56 +1,51 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckSquare, Plus, Check, Trash2, GripVertical,
   Pencil, X as XIcon,
 } from "lucide-react";
 import { userMissionsApi } from "@/lib/api";
 
-export default function MissionCard({ initialItems }) {
-  const [items, setItems] = useState(initialItems || []);
-  const [loading, setLoading] = useState(!initialItems);
+export default function MissionCard() {
+  const queryClient = useQueryClient();
   const [newTitle, setNewTitle] = useState("");
   const [editing, setEditing] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
-    const res = await userMissionsApi.list();
-    setItems(res.items || []);
-    setLoading(false);
-  };
-  useEffect(() => {
-    if (!initialItems) load();
-  }, [initialItems]);
+  const { data: missionData, isLoading } = useQuery({
+    queryKey: ["user-missions"],
+    queryFn: userMissionsApi.list,
+  });
+  const items = missionData?.items || [];
+
+  const refetch = () => queryClient.invalidateQueries({ queryKey: ["user-missions"] });
 
   const add = async (e) => {
     e?.preventDefault();
     const t = newTitle.trim();
     if (!t) return;
     setNewTitle("");
-    const created = await userMissionsApi.create({ title: t });
-    setItems((cur) => [...cur, created]);
+    try { await userMissionsApi.create({ title: t }); refetch(); }
+    catch (err) { console.error("[MissionCard] Failed to add:", err); }
   };
 
   const toggle = async (m) => {
-    setItems((cur) => cur.map((x) => x.id === m.id ? { ...x, completed: !x.completed } : x));
-    try { await userMissionsApi.update(m.id, { completed: !m.completed }); }
-    catch (err) { console.error("[MissionCard] Failed to toggle:", err); load(); }
+    try { await userMissionsApi.update(m.id, { completed: !m.completed }); refetch(); }
+    catch (err) { console.error("[MissionCard] Failed to toggle:", err); }
   };
 
   const remove = async (m) => {
-    setItems((cur) => cur.filter((x) => x.id !== m.id));
-    try { await userMissionsApi.remove(m.id); }
-    catch (err) { console.error("[MissionCard] Failed to remove:", err); load(); }
+    try { await userMissionsApi.remove(m.id); refetch(); }
+    catch (err) { console.error("[MissionCard] Failed to remove:", err); }
   };
 
   const saveEdit = async () => {
     if (!editing) return;
     const t = (editing.title || "").trim();
-    if (!t) { setEditing(null); return; }
     const id = editing.id;
-    setItems((cur) => cur.map((x) => x.id === id ? { ...x, title: t } : x));
     setEditing(null);
-    try { await userMissionsApi.update(id, { title: t }); }
-    catch (err) { console.error("[MissionCard] Failed to save edit:", err); load(); }
+    if (!t) return;
+    try { await userMissionsApi.update(id, { title: t }); refetch(); }
+    catch (err) { console.error("[MissionCard] Failed to save edit:", err); }
   };
 
   const move = async (idx, dir) => {
@@ -59,10 +54,9 @@ export default function MissionCard({ initialItems }) {
     if (j < 0 || j >= incomplete.length) return;
     const newIncomplete = [...incomplete];
     [newIncomplete[idx], newIncomplete[j]] = [newIncomplete[j], newIncomplete[idx]];
-    const completed = items.filter((x) => x.completed);
-    setItems([...newIncomplete, ...completed]);
-    try { await userMissionsApi.reorder(newIncomplete.map((x) => x.id)); }
-    catch (err) { console.error("[MissionCard] Failed to reorder:", err); load(); }
+    const ids = newIncomplete.map((x) => x.id);
+    try { await userMissionsApi.reorder(ids); refetch(); }
+    catch (err) { console.error("[MissionCard] Failed to reorder:", err); }
   };
 
   const incomplete = items.filter((x) => !x.completed);
@@ -80,10 +74,10 @@ export default function MissionCard({ initialItems }) {
         </span>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="space-y-2">{[...Array(2)].map((_, i) => <div key={i} className="skeleton h-9" />)}</div>
       ) : (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 max-h-[280px] overflow-y-auto">
           {incomplete.length === 0 && completed.length === 0 && (
             <p className="text-xs text-[hsl(var(--fg-muted))]">
               No tasks yet. Add anything you want to commit to today.

@@ -1840,7 +1840,7 @@ async def execution_queue(category: Optional[str] = None):
         })
 
     # ── Sort by date, then prioritize overdue over future ──
-    items.sort(key=lambda x: (x["due_date"] != today and x["due_date"], x["due_date"]))
+    items.sort(key=lambda x: (x["due_date"] != today, x["due_date"]))
 
     # ── Group ──
     groups = {"overdue": [], "today": [], "this_week": [], "upcoming": []}

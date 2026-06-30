@@ -124,8 +124,8 @@ export default function Timeline() {
   const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
   return (
-    <div className="space-y-6">
-      <div className="card-2 px-4 sm:px-5 py-3 sm:py-4 space-y-2.5">
+    <div className="space-y-4">
+      <div className="card-2 px-4 sm:px-5 py-3 sm:py-4 space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <div>
@@ -195,48 +195,50 @@ function QueueView({ queue, completedEntries, expandedGroups, toggleGroup, navig
   }
 
   return (
-    <div className="space-y-4">
-      {Object.entries(GROUP_CONFIG).map(([key, g]) => {
-        let items;
-        if (key === "completed") {
-          items = completedEntries.map((e) => ({
-            id: e.id,
-            kind: "timeline_entry",
-            subject: e.subject,
-            title: e.title,
-            due_date: e.date,
-            link: "",
-            meta: `${e.activity} · ${e.duration_min > 0 ? fmtDuration(e.duration_min) : ""}`,
-            entry: e,
-          }));
-        } else {
-          items = queue.groups[key] || [];
-        }
-        if (items.length === 0) return null;
+    <div className="card-2 p-4">
+      <div className="space-y-1">
+        {Object.entries(GROUP_CONFIG).map(([key, g]) => {
+          let items;
+          if (key === "completed") {
+            items = completedEntries.map((e) => ({
+              id: e.id,
+              kind: "timeline_entry",
+              subject: e.subject,
+              title: e.title,
+              due_date: e.date,
+              link: "",
+              meta: `${e.activity} · ${e.duration_min > 0 ? fmtDuration(e.duration_min) : ""}`,
+              entry: e,
+            }));
+          } else {
+            items = queue.groups[key] || [];
+          }
+          if (items.length === 0) return null;
 
-        const isExp = expandedGroups[key];
-        return (
-          <div key={key} className="card-2 overflow-hidden">
-            <button
-              onClick={() => toggleGroup(key)}
-              className={`w-full flex items-center justify-between px-5 py-3 text-left text-sm font-semibold tracking-wide uppercase transition-colors hover:bg-[hsl(var(--bg-elev))]/60 border-b ${isExp ? "border-border" : "border-transparent"}`}
-            >
-              <span className={`${g.color} flex items-center gap-2`}>
-                <span className={`w-2 h-2 rounded-full ${g.dot}`} />
-                {g.label}
-              </span>
-              <span className="mono text-xs text-[hsl(var(--fg-muted))]">{items.length}</span>
-            </button>
-            {isExp && (
-              <div className="divide-y divide-border/50">
-                {items.map((item) => (
-                  <QueueItem key={item.id} item={item} navigate={navigate} openEntry={openEntry} />
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+          const isExp = expandedGroups[key];
+          return (
+            <div key={key}>
+              <button
+                onClick={() => toggleGroup(key)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded text-left text-xs font-semibold tracking-wide uppercase transition-colors hover:bg-[hsl(var(--bg-elev))]/60`}
+              >
+                <span className={`${g.color} flex items-center gap-1.5`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${g.dot}`} />
+                  {g.label}
+                </span>
+                <span className="mono text-[11px] text-[hsl(var(--fg-muted))]">{items.length}</span>
+              </button>
+              {isExp && (
+                <div className="space-y-0.5 mb-1">
+                  {items.map((item) => (
+                    <QueueItem key={item.id} item={item} navigate={navigate} openEntry={openEntry} />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -254,23 +256,21 @@ function QueueItem({ item, navigate, openEntry }) {
   };
 
   return (
-    <div className="flex items-center gap-3 px-5 py-3 hover:bg-[hsl(var(--bg-elev))]/30 transition-colors group">
-      <Icon className="w-4 h-4 text-[hsl(var(--fg-subtle))] shrink-0" />
+    <button
+      onClick={handleStart}
+      className="w-full flex items-center gap-2 px-3 py-2 rounded text-left hover:bg-[hsl(var(--bg-elev))]/60 transition-colors group"
+    >
+      <Icon className="w-3 h-3 text-[hsl(var(--fg-subtle))] shrink-0" />
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium truncate">{item.title}</div>
-        <div className="text-[10px] text-[hsl(var(--fg-subtle))] flex items-center gap-1.5 mt-0.5">
+        <div className="text-xs truncate">{item.title}</div>
+        <div className="text-[10px] text-[hsl(var(--fg-subtle))] flex items-center gap-1.5">
           {subjLabel && <span className={`inline-flex items-center px-1.5 py-px rounded border text-[9px] font-semibold ${subjectColor(item.subject).bg} ${subjectColor(item.subject).text} ${subjectColor(item.subject).border}`}>{subjLabel}</span>}
           <span>{item.meta}</span>
           {item.due_date && <span>· {relLabel(item.due_date)}</span>}
         </div>
       </div>
-      <button
-        onClick={handleStart}
-        className="btn-primary text-[11px] px-3 py-1.5 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
-      >
-        Start <ArrowRight className="w-3 h-3" />
-      </button>
-    </div>
+      <ArrowRight className="w-3 h-3 text-[hsl(var(--accent))] opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+    </button>
   );
 }
 
@@ -311,14 +311,14 @@ function MonthlyView({ cursor, dayMap, calMap, selectedDate, setSelectedDate, op
                 key={i}
                 data-testid={TID.tlCell(ds)}
                 onClick={() => setSelectedDate(ds)}
-                className={`aspect-square rounded border-2 p-1.5 text-left flex flex-col justify-between transition-all ${
+                className={`aspect-square rounded border-2 p-1 text-left flex flex-col justify-between transition-all ${
                   isSelected ? "border-[hsl(var(--accent))]" : isToday ? "border-[hsl(var(--accent))]/40" : "border-border"
                 } hover:border-[hsl(var(--accent))]/60`}
                 style={c && c.study_minutes > 0 ? { backgroundColor: `hsl(var(--accent) / ${intensity * 0.25})` } : {}}
               >
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs ${isToday ? "font-bold text-[hsl(var(--accent))]" : "text-[hsl(var(--fg-muted))]"}`}>{d.getDate()}</span>
-                  {totalActivities > 0 && <span className="text-[9px] mono text-[hsl(var(--fg-muted))]">{totalActivities}</span>}
+                  <span className={`text-[11px] sm:text-xs ${isToday ? "font-bold text-[hsl(var(--accent))]" : "text-[hsl(var(--fg-muted))]"}`}>{d.getDate()}</span>
+                  {totalActivities > 0 && <span className="text-[8px] sm:text-[9px] mono text-[hsl(var(--fg-muted))]">{totalActivities}</span>}
                 </div>
                 <div className="space-y-0.5">
                   {c && c.study_minutes > 0 && <div className="text-[9px] mono text-[hsl(var(--fg))]">{fmtDuration(c.study_minutes)}</div>}
@@ -356,7 +356,7 @@ function WeeklyView({ rangeStart, dayMap, calMap, openEntry }) {
         const c = calMap[d];
         const isToday = d === todayISO();
         return (
-          <div key={d} className={`card-2 p-3 min-h-[280px] flex flex-col ${isToday ? "border-[hsl(var(--accent))]" : ""}`}>
+          <div key={d} className={`card-2 p-2 sm:p-3 min-h-[200px] sm:min-h-[240px] flex flex-col ${isToday ? "border-[hsl(var(--accent))]" : ""}`}>
             <div className="label-x">{new Date(d + "T00:00:00").toLocaleDateString(undefined, { weekday: "short" })}</div>
             <div className="text-2xl font-semibold mt-0.5">{new Date(d + "T00:00:00").getDate()}</div>
             {c && c.study_minutes > 0 && <div className="text-[10px] mono text-[hsl(var(--fg-muted))]">{fmtDuration(c.study_minutes)}</div>}

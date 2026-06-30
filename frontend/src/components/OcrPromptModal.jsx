@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { Copy, X } from "lucide-react";
 
 const OCR_PROMPT =
-  "Extract the question into clean Markdown. Preserve paragraphs, lists, tables, code blocks and indentation. Convert all mathematics to LaTeX (`$...$`, `$$...$$`). Do not summarize or solve. If text is unreadable, write `[unclear]`. Return only: **Question**, **Options**, **Correct Answer** (if visible), **Explanation** (if visible).";
+  "Extract the question into clean Markdown. Preserve paragraphs, lists, tables, code blocks and indentation. Convert all mathematics to LaTeX (`$...$`, `$$...$$`). Do not summarize or solve. If text is unreadable, write `[unclear]`. Return only these sections: **Question**, **Options**, **Correct Answer**, **Explanation** (if visible), **Subject** (e.g. OS, DS, CN, COA, Compilers, DBMS, TOC, DM, EM, DL, C), **Type** (MCQ, MSQ, or NAT), **Exam / Source** (e.g. GATE, ISRO, BARC, UGC NET), **Year** (4-digit year, if visible).";
 
 export default function OcrPromptModal({ open, onClose }) {
   const ref = useRef(null);

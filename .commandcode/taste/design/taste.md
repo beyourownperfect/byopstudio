@@ -5,3 +5,6 @@
 - Use warm colors for the accent/primary palette instead of blue. Keep gradients minimal and hover effects subtle. Confidence: 0.65
 - Light mode backgrounds should use subtle off-white, cream, or light pink tones rather than pure white. Confidence: 0.70
 - Design UI flows with the student's exam preparation journey in mind — prioritize clarity, reduce cognitive load, and make every interaction feel natural for someone deep in study mode. Confidence: 0.70
+- Avoid duplicating widgets or information across pages — keep a single canonical instance (e.g., one global countdown in the header, not per-page copies). Confidence: 0.70
+- Design list-based sections like Today's Mission and Execution Queue to handle growth gracefully — use collapsible groups, scrollable containers, and high information density so vertical space stays bounded even with many items. Confidence: 0.70
+- Each page should have one clearly dominant primary action button; all other controls should be visually secondary to reduce cognitive competition and create a more polished feel. Confidence: 0.75
