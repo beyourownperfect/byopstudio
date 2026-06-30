@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Zap, BookOpen, Calendar, Activity, Command as CmdIcon, Menu, X, Sun, Moon } from "lucide-react";
 import { TID } from "@/lib/constants";
