@@ -55,7 +55,7 @@ const FILTER_MODES = [
 const STORAGE_KEY = "byop.repo.filters.v1";
 const readSaved = () => {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
-  catch { return {}; }
+  catch (err) { console.error("[Repository] Failed to parse saved filters:", err); return {}; }
 };
 
 export default function Repository() {
@@ -97,7 +97,7 @@ export default function Repository() {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ subject, filterMode, search, sortBy }));
-    } catch { /* ignore quota */ }
+    } catch (err) { console.error("[Repository] Failed to persist filters:", err); }
   }, [subject, filterMode, search, sortBy]);
 
   // Client-side sorting layered over backend list
@@ -152,7 +152,7 @@ export default function Repository() {
   const toggleBookmark = async (q) => {
     setItems((prev) => prev.map((it) => it.id === q.id ? { ...it, bookmarked: !it.bookmarked } : it));
     try { await questionsApi.update(q.id, { bookmarked: !q.bookmarked }); }
-    catch { load(); }
+    catch (err) { console.error("[Repository] Failed to toggle bookmark:", err); load(); }
   };
 
   const handleDelete = async (id) => {
@@ -233,29 +233,34 @@ export default function Repository() {
 
   return (
     <div className="space-y-6">
-      <div className="card-2 px-5 py-4 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-xl font-semibold">Repository</h1>
-            <p className="text-xs text-[hsl(var(--fg-muted))]">Single source of truth · {sortedItems.length} questions</p>
+      <div className="card-2 px-4 sm:px-5 py-3 sm:py-4 space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div>
+              <h1 className="text-xl font-semibold">Repository</h1>
+              <p className="text-xs text-[hsl(var(--fg-muted))]">Single source of truth · {sortedItems.length} questions</p>
+            </div>
+            <HelpButton moduleKey="repository" title={HELP_CONTENT.repository.title} sections={HELP_CONTENT.repository.sections} />
           </div>
-          <HelpButton moduleKey="repository" title={HELP_CONTENT.repository.title} sections={HELP_CONTENT.repository.sections} />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <button onClick={() => setOcrOpen(true)} className="btn btn-ghost text-xs" data-testid="repo-ocr-btn" title="Copy OCR prompt for AI">
-            <FileText className="w-3.5 h-3.5" /> OCR
+          <button onClick={startNew} className="btn btn-primary sm:hidden" data-testid={TID.repoNewBtn}>
+            <Plus className="w-3.5 h-3.5" /> New
           </button>
-          <label className="btn cursor-pointer" data-testid={TID.repoImportCsv}>
-            <Upload className="w-3.5 h-3.5" /> Import CSV
+        </div>
+        <div className="flex items-center gap-1 flex-wrap">
+          <button onClick={() => setOcrOpen(true)} className="btn btn-ghost text-xs" data-testid="repo-ocr-btn" title="Copy OCR prompt for AI">
+            <FileText className="w-3.5 h-3.5" /> <span className="hidden sm:inline">OCR</span>
+          </button>
+          <label className="btn cursor-pointer text-xs" data-testid={TID.repoImportCsv}>
+            <Upload className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Import CSV</span>
             <input type="file" accept=".csv" onChange={onImport} className="hidden" />
           </label>
           <button onClick={() => setImportGuideOpen(true)} className="btn btn-ghost p-1.5" title="CSV import guide">
             <HelpCircle className="w-3.5 h-3.5" />
           </button>
-          <button onClick={onExport} className="btn" data-testid={TID.repoExportCsv}>
-            <Download className="w-3.5 h-3.5" /> Export CSV
+          <button onClick={onExport} className="btn text-xs" data-testid={TID.repoExportCsv}>
+            <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Export CSV</span>
           </button>
-          <button onClick={startNew} className="btn btn-primary" data-testid={TID.repoNewBtn}>
+          <button onClick={startNew} className="btn btn-primary hidden sm:inline-flex" data-testid={TID.repoNewBtn}>
             <Plus className="w-3.5 h-3.5" /> New question
           </button>
         </div>
@@ -288,7 +293,7 @@ export default function Repository() {
       <div className="card-2 overflow-hidden">
         <div className="overflow-x-auto">
         <div className="min-w-[870px]">
-        <div className="grid grid-cols-[28px_44px_40px_1fr_70px_70px_66px_136px] px-4 py-2 text-[10px] font-semibold tracking-[0.12em] uppercase text-[hsl(var(--fg-subtle))] border-b-2 border-border bg-[hsl(var(--bg-elev-2))] sticky top-0 z-10">
+        <div className="grid grid-cols-[28px_40px_36px_1fr_60px_60px_52px_110px] sm:grid-cols-[28px_44px_40px_1fr_70px_70px_66px_136px] gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 text-[10px] font-semibold tracking-[0.12em] uppercase text-[hsl(var(--fg-subtle))] border-b-2 border-border bg-[hsl(var(--bg-elev-2))] sticky top-0 z-10">
           <input type="checkbox" checked={items.length > 0 && selected.size === items.length} onChange={toggleAll} className="accent-[hsl(var(--accent))]" />
           <SortHeader label="Subj" onClick={() => toggleSort("subject")} icon={sortIcon("subject")} />
           <SortHeader label="Type" onClick={() => toggleSort("type")} icon={sortIcon("type")} />
@@ -301,7 +306,7 @@ export default function Repository() {
 
         {loading ? (
           [...Array(6)].map((_, i) => (
-            <div key={i} className="grid grid-cols-[28px_44px_40px_1fr_70px_70px_66px_136px] gap-2.5 px-4 py-2 border-b border-border/50">
+            <div key={i} className="grid grid-cols-[28px_40px_36px_1fr_60px_60px_52px_110px] sm:grid-cols-[28px_44px_40px_1fr_70px_70px_66px_136px] gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 border-b border-border/50">
               {[...Array(8)].map((_, j) => <div key={j} className="skeleton h-3.5" />)}
             </div>
           ))
@@ -372,7 +377,7 @@ function RepoRow({ q, selected, search, onToggle, onBookmark, onEdit, onDelete, 
   return (
     <div data-testid={TID.repoRow(q.id)}
       onDoubleClick={handleDoubleClick}
-      className={`grid grid-cols-[28px_44px_40px_1fr_70px_70px_66px_136px] gap-2 items-center px-4 py-2 border-b border-border/50 text-sm cursor-default select-none transition-colors ${
+      className={`grid grid-cols-[28px_40px_36px_1fr_60px_60px_52px_110px] sm:grid-cols-[28px_44px_40px_1fr_70px_70px_66px_136px] gap-1.5 sm:gap-2 items-center px-2 sm:px-4 py-2 border-b border-border/50 text-sm cursor-default select-none transition-colors ${
         selected ? "bg-[hsl(var(--accent))]/10 border-l-2 border-l-[hsl(var(--accent))]" : "hover:bg-[hsl(var(--bg-elev))]/80"
       }`}>
       <input data-testid={TID.repoRowCheckbox(q.id)} type="checkbox" checked={selected} onChange={onToggle} data-no-dbl className="accent-[hsl(var(--accent))]" />

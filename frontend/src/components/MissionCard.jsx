@@ -31,13 +31,13 @@ export default function MissionCard() {
   const toggle = async (m) => {
     setItems((cur) => cur.map((x) => x.id === m.id ? { ...x, completed: !x.completed } : x));
     try { await userMissionsApi.update(m.id, { completed: !m.completed }); }
-    catch { load(); }
+    catch (err) { console.error("[MissionCard] Failed to toggle:", err); load(); }
   };
 
   const remove = async (m) => {
     setItems((cur) => cur.filter((x) => x.id !== m.id));
     try { await userMissionsApi.remove(m.id); }
-    catch { load(); }
+    catch (err) { console.error("[MissionCard] Failed to remove:", err); load(); }
   };
 
   const saveEdit = async () => {
@@ -48,7 +48,7 @@ export default function MissionCard() {
     setItems((cur) => cur.map((x) => x.id === id ? { ...x, title: t } : x));
     setEditing(null);
     try { await userMissionsApi.update(id, { title: t }); }
-    catch { load(); }
+    catch (err) { console.error("[MissionCard] Failed to save edit:", err); load(); }
   };
 
   const move = async (idx, dir) => {
@@ -60,7 +60,7 @@ export default function MissionCard() {
     const completed = items.filter((x) => x.completed);
     setItems([...newIncomplete, ...completed]);
     try { await userMissionsApi.reorder(newIncomplete.map((x) => x.id)); }
-    catch { load(); }
+    catch (err) { console.error("[MissionCard] Failed to reorder:", err); load(); }
   };
 
   const incomplete = items.filter((x) => !x.completed);

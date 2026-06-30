@@ -584,7 +584,8 @@ async def bulk_create_questions(payload: Dict[str, List[Dict[str, Any]]]):
             await db.questions.insert_one(q.model_dump())
             await _ensure_srs(q.id)
             created += 1
-        except Exception:
+        except Exception as exc:
+            logger.warning("Skipping CSV row during bulk import: %s", exc)
             skipped += 1
     return {"created": created, "skipped": skipped}
 

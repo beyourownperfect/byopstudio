@@ -50,7 +50,7 @@ export default function Layout() {
             </div>
             <div className="leading-tight min-w-0">
               <div className="font-semibold text-[13px] truncate">BYOPGateCS<span className="text-[hsl(var(--fg-subtle))]">.studio</span></div>
-              <div className="text-[9px] tracking-[0.18em] uppercase text-[hsl(var(--fg-subtle))] truncate">Study OS · v1.1</div>
+              <div className="text-[9px] tracking-[0.18em] uppercase text-[hsl(var(--fg-subtle))] truncate">Study OS · v1.2</div>
             </div>
           </div>
 

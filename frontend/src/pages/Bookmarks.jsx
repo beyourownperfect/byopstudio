@@ -26,7 +26,7 @@ export default function Bookmarks() {
   const toggleBookmark = async (q) => {
     setItems((prev) => prev.filter((i) => i.id !== q.id));
     try { await questionsApi.update(q.id, { bookmarked: false }); }
-    catch { load(); }
+    catch (err) { console.error("[Bookmarks] Failed to remove bookmark:", err); load(); }
   };
 
   return (

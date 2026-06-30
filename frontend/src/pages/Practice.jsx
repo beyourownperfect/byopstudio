@@ -170,7 +170,7 @@ export default function Practice() {
     if (!q) return;
     setQ({ ...q, bookmarked: !q.bookmarked });
     try { await questionsApi.update(q.id, { bookmarked: !q.bookmarked }); }
-    catch { setQ((cur) => ({ ...cur, bookmarked: !cur.bookmarked })); }
+    catch (err) { console.error("[Practice] Failed to toggle bookmark:", err); setQ((cur) => ({ ...cur, bookmarked: !cur.bookmarked })); }
   };
 
   if (!started) {

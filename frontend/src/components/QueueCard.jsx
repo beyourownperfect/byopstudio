@@ -25,7 +25,7 @@ export default function QueueCard() {
   const [expanded, setExpanded] = useState({ overdue: true, today: true, this_week: false, upcoming: false });
 
   useEffect(() => {
-    queueApi.get().then(setQueue).catch(() => {});
+    queueApi.get().then(setQueue).catch((err) => console.error("[QueueCard] Failed to load queue:", err));
   }, []);
 
   if (!queue || queue.total === 0) {

@@ -30,7 +30,8 @@ export default function QuestionDetailsModal({ open, onClose, questionId, onEdit
     try {
       await questionsApi.update(q.id, { bookmarked: next });
       onBookmarkChanged?.();
-    } catch {
+    } catch (err) {
+      console.error("[QuestionDetails] Failed to toggle bookmark:", err);
       setQ((cur) => ({ ...cur, bookmarked: !next }));
     }
   };

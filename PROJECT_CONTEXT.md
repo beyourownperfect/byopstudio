@@ -1,6 +1,6 @@
 # BYOPGateCS.studio — Project Context
 
-Single-user GATE CS study operating system. Capture questions → solve under SRS → schedule revisions → measure momentum. **v1.1 production-ready.** Deployed as a single Render web service backed by MongoDB Atlas.
+Single-user GATE CS study operating system. Capture questions → solve under SRS → schedule revisions → measure momentum. **v1.2 production-ready.** Deployed as a single Render web service backed by MongoDB Atlas.
 
 ---
 

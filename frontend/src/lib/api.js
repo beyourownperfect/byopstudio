@@ -98,7 +98,18 @@ export const lecturesApi = {
 export const subjectCompletionApi = {
   list: (params = {}) => c.get("/subject-completion", { params }).then((r) => r.data),
   upsert: (data) => c.post("/subject-completion", data).then((r) => r.data),
+  uploadResource: (scId, fileType, file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return c.post(`/subject-completion/${scId}/resource/${fileType}`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((r) => r.data);
+  },
+  removeResource: (scId, fileType) =>
+    c.delete(`/subject-completion/${scId}/resource/${fileType}`).then((r) => r.data),
 };
+
+export const resourceUrl = (filename) => `${API}/resources/${filename}`;
 
 export const seed = () => c.post("/seed-demo").then((r) => r.data);
 

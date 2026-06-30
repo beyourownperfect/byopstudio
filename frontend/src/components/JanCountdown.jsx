@@ -23,7 +23,7 @@ export default function JanCountdown() {
         update();
         const t = setInterval(update, 60 * 1000);
         return () => clearInterval(t);
-      } catch { /* ignore */ }
+      } catch (err) { console.error("[JanCountdown] Failed to load exam date:", err); }
     };
     load();
     return () => { cancelled = true; };

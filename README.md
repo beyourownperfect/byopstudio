@@ -2,7 +2,7 @@
 
 A single-user study operating system for GATE Computer Science prep. Capture questions, solve under spaced repetition, schedule revisions, and measure momentum — all without a planner.
 
-> **Version:** v1.1 · Open source.
+> **Version:** v1.2 · Open source.
 
 ---
 
@@ -21,18 +21,18 @@ Single user, no auth, no cloud lock-in. One-click deploy to Render, backed by Mo
 
 ## Features
 
-- **Pulse dashboard** — Execution Queue ("What should I do next?") prioritized into Overdue/Today/This Week/Upcoming with deep-links. Today's Mission (user checklist), Momentum (0-100 with sparkline), daily progress vs targets, Weak Topics, Subject Completion, GATE readiness, countdown to exam. Settings modal with exam date + daily targets. Onboarding card for zero-data users. Warm accent theme with card depth shadows and section dividers.
-- **Execution Queue** — aggregating SRS revisions, timeline scheduled revisions, revisit items, and user missions into one prioritized list. Click any item to jump to its owning module.
-- **Study Timer** — Stopwatch (teal) and Countdown (warm orange) modes in the Pulse header. Topic input, keyboard shortcuts (Space/R), Focus Mode modal with large display and presets (5m, 15m, 25m, 45m, 60m). Auto-saves completed sessions to study logs AND timeline. Manual Save button on inline bar. SessionStorage persistence cross-tab.
-- **Repository** — inline grid table with subject labels, search, filter by subject/mode, sort by column headers, multi-select bulk delete with undo, CSV import/export, OCR prompt modal. Double-click rows for full details modal with LaTeX, attempts history, and mastery.
-- **Practice** — SRS-driven sessions (MCQ / MSQ / NAT). Keyboard shortcuts (A-D pick options, 1-5 confidence with labels, Space/Enter submit, ←→ navigate). Session summary on completion or end-early (× button). Per-question stopwatch, feedback with explanation, bookmark, revisit scheduling, queue navigation.
+- **Pulse dashboard** — Compact header with inline Study Timer (stopwatch + countdown), GATE countdown, and settings gear. Execution Queue ("What should I do next?") prioritized into Overdue/Today/This Week/Upcoming with deep-links. Today's Mission (user checklist), Momentum (0-100 with sparkline), daily progress vs targets, Weak Topics, Subject Completion, GATE readiness. Warm accent theme with card depth shadows and section dividers.
+- **Execution Queue** — aggregating SRS revisions, timeline revisions, revisit items, and user missions into one prioritized list. Click any item to jump to its owning module. Default view on Timeline page with Completed section tracking finished entries.
+- **Confidence-aware SRS** — confidence 5 accelerates the next interval by 2 steps. Wrong answers regress by 2 intervals instead of full reset, preserving mature cards. 6 intervals: 1, 3, 7, 14, 30, 90 days.
+- **Study Timer** — compact inline bar in Pulse header. Stopwatch (teal) and Countdown (warm orange). Topic + subject + activity inputs. Keyboard shortcuts (Space/R). Focus Mode modal with large display and presets (5m, 15m, 25m, 45m, 60m). **Complete Session** action auto-creates study log + timeline entry + updates Pulse. SessionStorage persistence cross-tab.
+- **Repository** — inline grid table with responsive column widths. Subject labels, search, filter by subject/mode, sort by column headers, multi-select bulk delete with undo, CSV import/export with **Import Guide** modal (format reference + example CSV + OCR workflow). OCR prompt modal. Double-click rows for full details modal with LaTeX, attempts history, and mastery.
+- **Practice** — SRS-driven sessions (MCQ / MSQ / NAT). Keyboard shortcuts (A-D pick options, 1-5 confidence, Space/Enter submit, ←→ navigate). Session summary on completion. Per-question stopwatch, feedback with explanation, bookmark, revisit scheduling, queue navigation. Deep-link from Mistakes via `/solve/practice?mode=wrong`.
 - **Bookmarks** — starred questions with labeled subject badges, mastery scores, quick practice/revisit actions.
-- **Mistakes Bank** — wrong answers by 5 modes. Practice-all button. Labeled subject chips.
-- **Log** — live timer status from Pulse (sessionStorage bridge). Session summary cards. Daily/weekly/monthly collapsible views. **LectureTable** and **Subject Completion** checklist. Keyboard shortcut: N = new log entry.
-- **Timeline** — daily/weekly/monthly calendar of entries, scheduled SRS revisions, and revisits. Supports `?view=` URL param for deep-linking from Pulse.
-- **Timeline auto-bridging** — study timer saves, practice solving, log entries, and revisit completions all auto-create timeline entries. No data falls through the cracks.
+- **Mistakes Bank** — wrong answers by 5 modes. Practice Mistakes button deep-links to Practice with wrong filter. Labeled subject chips.
+- **Log** — live timer status bridged from Pulse. Session summary cards (total time, sessions, questions, accuracy). Daily/weekly/monthly collapsible views with inline-editable rows. **LectureTable** with subject-first creation, duration tracking (Done/Total), auto-calculated completion %. **Subject Completion** checklist tabular view with inline Short Notes and Traversal Questionnaire resource cells (upload/replace/remove .md/.pdf, inline viewer with Markdown rendering and PDF embedding). Keyboard shortcut: N = new log entry.
+- **Timeline** — Execution Queue (default), Daily, Weekly, Monthly views. Calendar cells show activity counts, study duration, and color-coded indicator bars. Scheduled revisions projected as virtual items on their target date. New entry modal with revision scheduling presets (+1d/+3d/+7d/+14d/+30d). Auto-bridging: study timer saves, practice solving, log entries, and revisit completions all auto-create timeline entries.
 - **Quick guides** — ? help button on every page with concise contextual documentation.
-- **Cmd/Ctrl-K** command palette with one-time discovery toast. Mobile-responsive (hamburger drawer).
+- **Cmd/Ctrl-K** command palette with one-time discovery toast. Mobile-responsive (hamburger drawer), responsive across 320px–1400px+. Dark/light theme toggle.
 
 ---
 
@@ -144,19 +144,21 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for the full step-by-step guide.
 
 ```
 ├── backend/
-│   ├── server.py               # All routes, models, helpers, seed, SPA serving
+│   ├── server.py               # All routes, models, helpers, seed, SPA serving (2189 lines, 18 sections)
 │   ├── requirements.txt
+│   ├── uploads/                # Subject resource files (Short Notes, Traversal Q&A)
 │   ├── Procfile
 │   └── tests/
 ├── frontend/
 │   └── src/
 │       ├── pages/              # Pulse, Repository, Practice, Bookmarks, Mistakes, Log, Timeline
-│       ├── components/         # Layout, LectureTable, StudyTimer, MissionCard, MarkdownRenderer,
-│       │                       # QuestionFormModal, QuestionDetailsModal, TimelineEntryModal,
-│       │                       # RevisitMenu, HelpButton, CommandPalette, Modal
-│       ├── lib/                # api.js, constants.js, dateUtils.js, helpContent.js
+│       ├── components/         # Layout, LectureTable, StudyTimer, MissionCard, QueueCard,
+│       │                       # MarkdownRenderer, QuestionFormModal, QuestionDetailsModal,
+│       │                       # TimelineEntryModal, RevisitMenu, HelpButton, CommandPalette,
+│       │                       # Modal, OcrPromptModal, JanCountdown, Latex, SubjectSelect
+│       ├── lib/                # api.js, constants.js, dateUtils.js, helpContent.js, usePasteMarkdown.js
+│       ├── hooks/              # useTheme.js
 │       └── index.css           # Tailwind + custom properties + component classes
-├── memory/                     # PRD, notes
 ├── render.yaml
 ├── README.md
 ├── DEPLOYMENT.md
@@ -175,4 +177,4 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for the full step-by-step guide.
 
 ---
 
-*Last updated: 2026-06-30 · v1.1*
+*Last updated: 2026-06-30 · v1.2*

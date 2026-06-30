@@ -6,7 +6,6 @@ import { SUBJECT_LABELS, TID } from "@/lib/constants";
 import { fmtDateLong } from "@/lib/dateUtils";
 import HelpButton from "@/components/HelpButton";
 import MissionCard from "@/components/MissionCard";
-import LectureTable from "@/components/LectureTable";
 import StudyTimer from "@/components/StudyTimer";
 import QueueCard from "@/components/QueueCard";
 import { HELP_CONTENT } from "@/lib/helpContent";
@@ -63,22 +62,26 @@ export default function Pulse() {
   return (
     <div className="space-y-6">
       {/* ━━━ Header ━━━ */}
-      <div className="card-2 px-5 py-4 flex items-end justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-2xl font-semibold flex items-center gap-2"><Zap className="w-5 h-5 text-[hsl(var(--accent))]" /> Pulse</h1>
-            <p className="text-xs text-[hsl(var(--fg-muted))]">{fmtDateLong(data.today)}</p>
+      <div className="card-2 px-4 sm:px-5 py-3 sm:py-4 space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2"><Zap className="w-5 h-5 text-[hsl(var(--accent))]" /> Pulse</h1>
+              <p className="text-xs text-[hsl(var(--fg-muted))]">{fmtDateLong(data.today)}</p>
+            </div>
+            <HelpButton moduleKey="pulse" title={HELP_CONTENT.pulse.title} sections={HELP_CONTENT.pulse.sections} />
           </div>
-          <HelpButton moduleKey="pulse" title={HELP_CONTENT.pulse.title} sections={HELP_CONTENT.pulse.sections} />
+          <div className="flex items-center gap-2">
+            <div className="text-right min-w-0">
+              <div className="label-x truncate">GATE in</div>
+              <div className="font-semibold mono text-base sm:text-lg">{data.days_until_exam}<span className="text-[hsl(var(--fg-muted))] text-xs ml-1">days</span></div>
+              <StudyStatus hasStudy={data.has_study_today} />
+            </div>
+            <button onClick={() => { setExamDate(data.exam_date); setDailyQ(data.targets.daily_question_target); setDailyMin(data.targets.daily_study_minutes_target); setDailyRev(data.targets.daily_revision_target); setShowSettings(true); }} className="btn-ghost p-2 hover:bg-[hsl(var(--bg-elev-2))] transition-colors shrink-0"><SettingsIcon className="w-4 h-4" /></button>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex justify-center sm:justify-start">
           <StudyTimer />
-          <div className="text-right">
-            <div className="label-x">GATE in</div>
-            <div className="font-semibold mono text-lg">{data.days_until_exam}<span className="text-[hsl(var(--fg-muted))] text-xs ml-1">days</span></div>
-            <StudyStatus hasStudy={data.has_study_today} />
-          </div>
-          <button onClick={() => { setExamDate(data.exam_date); setDailyQ(data.targets.daily_question_target); setDailyMin(data.targets.daily_study_minutes_target); setDailyRev(data.targets.daily_revision_target); setShowSettings(true); }} className="btn-ghost p-2 hover:bg-[hsl(var(--bg-elev-2))] transition-colors"><SettingsIcon className="w-4 h-4" /></button>
         </div>
       </div>
 
@@ -128,10 +131,6 @@ export default function Pulse() {
         <WeakTopicsCard weakTopics={data.weak_topics} expanded={weakExpanded} toggle={() => setWeakExpanded(!weakExpanded)} navigate={navigate} />
         <SubjectCompletionCard subjects={sortedSubjects} />
       </div>
-
-      {/* ━━━ Lectures ━━━ */}
-      <SectionLabel icon={<BookOpen className="w-3.5 h-3.5" />} text="Lectures" />
-      <LectureTable />
 
       {/* Settings modal */}
       {showSettings && (

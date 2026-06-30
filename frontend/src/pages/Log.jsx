@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Trash2, Clock, ChevronDown, CheckCircle, X as XIcon } from "lucide-react";
-import { logsApi, subjectCompletionApi } from "@/lib/api";
+import { Plus, Trash2, Clock, ChevronDown, CheckCircle, X as XIcon, FileText, Upload, Eye, FileQuestion } from "lucide-react";
+import { logsApi, subjectCompletionApi, resourceUrl } from "@/lib/api";
 import { SUBJECTS, SUBJECT_LABELS, ACTIVITIES, TID } from "@/lib/constants";
 import { todayISO, fmtDate, fmtDuration, isoAdd } from "@/lib/dateUtils";
 import Modal from "@/components/Modal";
 import HelpButton from "@/components/HelpButton";
 import LectureTable from "@/components/LectureTable";
 import SubjectSelect from "@/components/SubjectSelect";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
 const emptyForm = {
@@ -19,7 +20,7 @@ function parseTimerState() {
   try {
     const raw = sessionStorage.getItem("byop.timer");
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch (err) { console.error("[Log] Failed to parse timer state:", err); return null; }
 }
 
 function getTimerStatusText(state) {
@@ -43,6 +44,11 @@ export default function Log() {
   const [completions, setCompletions] = useState([]);
   const [completionExpanded, setCompletionExpanded] = useState(false);
   const [completionSubject, setCompletionSubject] = useState("ALL");
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerTitle, setViewerTitle] = useState("");
+  const [viewerUrl, setViewerUrl] = useState("");
+  const [viewerIsPdf, setViewerIsPdf] = useState(false);
+  const [viewerContent, setViewerContent] = useState("");
 
   // Inline edit state for daily log rows
   const [editingLogId, setEditingLogId] = useState(null);
@@ -72,6 +78,40 @@ export default function Log() {
   useEffect(() => {
     if (completionExpanded && completions.length === 0) loadCompletions();
   }, [completionExpanded]); // eslint-disable-line
+
+  const handleUploadResource = async (scId, fileType, file) => {
+    await subjectCompletionApi.uploadResource(scId, fileType, file);
+    loadCompletions(completionSubject !== "ALL" ? completionSubject : null);
+  };
+
+  const handleRemoveResource = async (scId, fileType) => {
+    await subjectCompletionApi.removeResource(scId, fileType);
+    loadCompletions(completionSubject !== "ALL" ? completionSubject : null);
+  };
+
+  const handleViewResource = async (item, fileType) => {
+    const fileKey = `${fileType}_file`;
+    const filenameKey = `${fileType}_filename`;
+    const filename = item[filenameKey] || item[fileKey] || "";
+    const url = resourceUrl(item[fileKey]);
+    const isPdf = filename.toLowerCase().endsWith(".pdf");
+    setViewerTitle(`${fileType === "short_notes" ? "Short Notes" : "Traversal Questionnaire"} — ${item.subject}`);
+    setViewerUrl(url);
+    setViewerIsPdf(isPdf);
+    if (!isPdf) {
+      try {
+        const res = await fetch(url);
+        const text = await res.text();
+        setViewerContent(text);
+      } catch (err) {
+        console.error("[Log] Failed to fetch resource content:", err);
+        setViewerContent("");
+      }
+    } else {
+      setViewerContent("");
+    }
+    setViewerOpen(true);
+  };
 
   const toggleCompletion = async (item, key) => {
     const payload = { subject: item.subject, topic: item.topic, [key]: !item[key] };
@@ -146,7 +186,7 @@ export default function Log() {
     }
     setEditingLogId(null);
     setLogs((prev) => prev.map((l) => (l.id === log.id ? { ...l, ...payload } : l)));
-    try { await logsApi.update(log.id, payload); } catch { load(); }
+    try { await logsApi.update(log.id, payload); } catch (err) { console.error("[Log] Failed to update log:", err); load(); }
   };
 
   const handleLogEditKey = (e, log) => {
@@ -177,23 +217,23 @@ export default function Log() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card-2 px-5 py-4 flex items-end justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-xl font-semibold">Log</h1>
-            <p className="text-xs text-[hsl(var(--fg-muted))]">Auto-logged from practice & timeline. Manual entries take 10 seconds.</p>
+      <div className="card-2 px-4 sm:px-5 py-3 sm:py-4 space-y-2.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div>
+              <h1 className="text-xl font-semibold">Log</h1>
+              <p className="text-xs text-[hsl(var(--fg-muted))] hidden sm:block">Auto-logged from practice & timeline. Manual entries take 10 seconds.</p>
+            </div>
+            <HelpButton moduleKey="log" title={HELP_CONTENT.log.title} sections={HELP_CONTENT.log.sections} />
           </div>
-          <HelpButton moduleKey="log" title={HELP_CONTENT.log.title} sections={HELP_CONTENT.log.sections} />
+          <button data-testid={TID.logNewBtn} onClick={() => setOpen(true)} className="btn btn-primary text-xs"><Plus className="w-3.5 h-3.5" /> Log session</button>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="card-1 p-0.5 flex items-center text-xs">
-            {["daily", "weekly", "monthly"].map((v) => (
-              <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded transition-colors ${view === v ? "bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg))]" : "text-[hsl(var(--fg-muted))]"}`}>
-                {v}
-              </button>
-            ))}
-          </div>
-          <button data-testid={TID.logNewBtn} onClick={() => setOpen(true)} className="btn btn-primary"><Plus className="w-3.5 h-3.5" /> Log session</button>
+        <div className="card-1 p-0.5 flex items-center text-xs self-start">
+          {["daily", "weekly", "monthly"].map((v) => (
+            <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded transition-colors ${view === v ? "bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg))]" : "text-[hsl(var(--fg-muted))]"}`}>
+              {v}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -251,6 +291,9 @@ export default function Log() {
                 await subjectCompletionApi.upsert({ subject: subj, topic: "" });
                 loadCompletions(completionSubject !== "ALL" ? completionSubject : null);
               }}
+              onUploadResource={handleUploadResource}
+              onRemoveResource={handleRemoveResource}
+              onViewResource={handleViewResource}
             />
           </div>
         )}
@@ -279,12 +322,12 @@ export default function Log() {
                   </div>
                 </button>
                 {isExpanded && (
-                  <div className="border-t border-border px-3 py-2 overflow-x-auto">
+                  <div className="border-t border-border px-2 sm:px-3 py-2 overflow-x-auto">
                     {byDate[d].map((l) => {
                       const isEditing = editingLogId === l.id;
                       return (
                       <div key={l.id}
-                        className="flex items-center gap-2 sm:gap-3 py-1.5 px-2 rounded row-hover text-sm min-w-[580px]"
+                        className="flex items-center gap-1.5 sm:gap-3 py-1.5 px-1 sm:px-2 rounded row-hover text-xs sm:text-sm min-w-[480px] sm:min-w-[580px]"
                       >
                         <span className="chip shrink-0 text-[11px]">{l.activity}</span>
                         <span className="chip mono shrink-0 text-[11px]">{l.subject}</span>
@@ -322,6 +365,39 @@ export default function Log() {
       <p className="text-[10px] text-[hsl(var(--fg-subtle))] uppercase tracking-[0.18em] text-center">
         {activeSubjects} active subjects in this period
       </p>
+
+      {/* ==== Resource viewer modal ==== */}
+      {viewerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setViewerOpen(false)} />
+          <div className="relative card-2 w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-5 py-3 border-b-2 border-border shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                {viewerIsPdf ? <FileText className="w-4 h-4 text-[hsl(var(--danger))] shrink-0" /> : <FileQuestion className="w-4 h-4 text-[hsl(var(--info))] shrink-0" />}
+                <h3 className="font-semibold text-sm truncate">{viewerTitle}</h3>
+              </div>
+              <button onClick={() => setViewerOpen(false)} className="btn-ghost p-1.5 text-[hsl(var(--fg-muted))] hover:text-[hsl(var(--fg))]" title="Close (Esc)">
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-5">
+              {viewerIsPdf ? (
+                <iframe src={viewerUrl} className="w-full h-[70vh] rounded border border-border" title="PDF viewer" />
+              ) : (
+                <div className="markdown-body max-w-none">
+                  {viewerContent ? <MarkdownRenderer>{viewerContent}</MarkdownRenderer> : <p className="text-[hsl(var(--fg-muted))] text-sm">Loading…</p>}
+                </div>
+              )}
+            </div>
+            <div className="border-t border-border px-5 py-2.5 flex items-center justify-end gap-2 shrink-0">
+              <a href={viewerUrl} target="_blank" rel="noreferrer" className="btn text-xs">
+                <Eye className="w-3 h-3" /> Open raw
+              </a>
+              <button onClick={() => setViewerOpen(false)} className="btn btn-primary text-xs">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ==== Log session modal ==== */}
       <Modal open={open} onClose={() => setOpen(false)} title="Log a study session" size="md" data-testid={TID.logForm}
@@ -379,7 +455,7 @@ const COMPLETION_MILESTONES = [
   { key: "weekly_quiz_completed", label: "Quiz", core: false },
 ];
 
-function CompletionTable({ completions, subjectFilter, onToggle, onExplain, subjOptions, onCreateCompletion }) {
+function CompletionTable({ completions, subjectFilter, onToggle, onExplain, subjOptions, onCreateCompletion, onUploadResource, onRemoveResource, onViewResource }) {
   const existingSubjects = new Set(completions.map((c) => c.subject));
 
   if (completions.length === 0) {
@@ -398,14 +474,15 @@ function CompletionTable({ completions, subjectFilter, onToggle, onExplain, subj
   return (
     <div className="overflow-x-auto">
       {/* Header row */}
-      <div className="flex items-center gap-2 px-4 py-1.5 text-[10px] uppercase tracking-wider text-[hsl(var(--fg-subtle))] border-b border-border min-w-[900px]">
+      <div className="flex items-center gap-2 px-4 py-1.5 text-[10px] uppercase tracking-wider text-[hsl(var(--fg-subtle))] border-b border-border min-w-[1050px]">
         <span className="w-10 shrink-0">Subj</span>
         {COMPLETION_MILESTONES.map((m) => (
           <span key={m.key} className="w-[60px] text-center shrink-0">{m.label}</span>
         ))}
         <span className="w-[70px] text-center shrink-0">Explain</span>
         <span className="w-14 text-right shrink-0">Core</span>
-        <div className="flex-1 min-w-[60px] ml-2" />
+        <span className="w-[110px] shrink-0 text-center">Notes</span>
+        <span className="w-[110px] shrink-0 text-center">Traversal</span>
       </div>
 
       {completions.map((item) => {
@@ -413,7 +490,7 @@ function CompletionTable({ completions, subjectFilter, onToggle, onExplain, subj
         const corePct = calc.core_percent || 0;
         const barColor = corePct >= 80 ? "bg-[hsl(var(--success))]" : corePct >= 40 ? "bg-[hsl(var(--warning))]" : "bg-[hsl(var(--danger))]";
         return (
-          <div key={item.id} className="flex items-center gap-2 px-4 py-1.5 hover:bg-[hsl(var(--bg-elev))]/60 transition-colors text-[12px] border-b border-border/60 last:border-b-0 min-w-[900px]">
+          <div key={item.id} className="flex items-center gap-2 px-4 py-1.5 hover:bg-[hsl(var(--bg-elev))]/60 transition-colors text-[12px] border-b border-border/60 last:border-b-0 min-w-[1050px]">
             <span className="chip chip-accent text-[11px] w-10 shrink-0">{item.subject}</span>
             {COMPLETION_MILESTONES.map((m) => (
               <button
@@ -439,9 +516,30 @@ function CompletionTable({ completions, subjectFilter, onToggle, onExplain, subj
               {item.can_explain_without_notes ? "Yes" : "—"}
             </button>
             <span className="w-14 text-right mono text-[11px] text-[hsl(var(--fg-muted))] shrink-0">{corePct}%</span>
-            <div className="flex-1 h-1.5 bg-[hsl(var(--bg-elev-2))] rounded-full overflow-hidden ml-2 min-w-[60px]">
-              <div className={`h-full rounded-full transition-all duration-300 ${barColor}`} style={{ width: `${corePct}%` }} />
-            </div>
+
+            {/* Short Notes */}
+            <InlineResource
+              scId={item.id}
+              fileType="short_notes"
+              filename={item.short_notes_filename || item.short_notes_file || ""}
+              hasFile={!!item.short_notes_file}
+              item={item}
+              onUpload={onUploadResource}
+              onRemove={onRemoveResource}
+              onView={(it) => onViewResource(it, "short_notes")}
+            />
+
+            {/* Traversal Questionnaire */}
+            <InlineResource
+              scId={item.id}
+              fileType="traversal"
+              filename={item.traversal_filename || item.traversal_file || ""}
+              hasFile={!!item.traversal_file}
+              item={item}
+              onUpload={onUploadResource}
+              onRemove={onRemoveResource}
+              onView={(it) => onViewResource(it, "traversal")}
+            />
           </div>
         );
       })}
@@ -455,5 +553,38 @@ function CompletionTable({ completions, subjectFilter, onToggle, onExplain, subj
         </div>
       )}
     </div>
+  );
+}
+
+function InlineResource({ scId, fileType, filename, hasFile, item, onUpload, onRemove, onView }) {
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) onUpload(scId, fileType, file);
+    e.target.value = "";
+  };
+
+  if (hasFile) {
+    return (
+      <div className="w-[110px] shrink-0 flex items-center gap-0.5 min-w-0">
+        <button onClick={() => onView(item)} className="flex-1 min-w-0 text-left group" title={filename}>
+          <span className="text-[10px] text-[hsl(var(--accent))] group-hover:underline truncate block">{filename}</span>
+        </button>
+        <label className="btn-ghost p-0.5 cursor-pointer text-[hsl(var(--fg-subtle))] hover:text-[hsl(var(--accent))]" title="Replace">
+          <Upload className="w-2.5 h-2.5" />
+          <input type="file" accept=".md,.pdf" onChange={handleFileChange} className="hidden" />
+        </label>
+        <button onClick={() => onRemove(scId, fileType)} className="btn-ghost p-0.5 text-[hsl(var(--danger))]/50 hover:text-[hsl(var(--danger))]" title="Remove">
+          <Trash2 className="w-2.5 h-2.5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <label className="w-[110px] shrink-0 flex items-center gap-1 cursor-pointer text-[10px] text-[hsl(var(--fg-subtle))] hover:text-[hsl(var(--accent))] transition-colors" title={`Attach ${fileType === "short_notes" ? "Short Notes" : "Traversal Q&A"}`}>
+      <Upload className="w-2.5 h-2.5 shrink-0" />
+      <span className="truncate">{fileType === "short_notes" ? "Notes" : "Q&A"}</span>
+      <input type="file" accept=".md,.pdf" onChange={handleFileChange} className="hidden" />
+    </label>
   );
 }

@@ -16,14 +16,14 @@ export default function Latex({ children, className = "" }) {
         if (block.startsWith("$$") && block.endsWith("$$")) {
           const math = block.slice(2, -2);
           try { return <BlockMath key={i} math={math} />; }
-          catch { return <code key={i}>{block}</code>; }
+          catch (err) { console.error("[Latex] Block render failed:", err); return <code key={i}>{block}</code>; }
         }
         const inlineParts = block.split(/(\$[^$]+\$)/g);
         return inlineParts.map((p, j) => {
           if (p.startsWith("$") && p.endsWith("$") && p.length > 2) {
             const math = p.slice(1, -1);
             try { return <InlineMath key={`${i}-${j}`} math={math} />; }
-            catch { return <code key={`${i}-${j}`}>{p}</code>; }
+            catch (err) { console.error("[Latex] Inline render failed:", err); return <code key={`${i}-${j}`}>{p}</code>; }
           }
           return <span key={`${i}-${j}`} style={{ whiteSpace: "pre-wrap" }}>{p}</span>;
         });

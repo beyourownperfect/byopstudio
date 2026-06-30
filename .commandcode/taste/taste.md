@@ -12,6 +12,7 @@
 # architecture
 - Keep implementations minimal and avoid over-engineering — prefer simple solutions (e.g., paste-to-markdown conversion) over rich/WYSIWYG editing experiences. Do not add features beyond what is explicitly requested. Confidence: 0.80
 - Reuse existing MongoDB collections, backend services, and calculations when adding features — avoid creating new APIs, collections, or duplicating business logic. Confidence: 0.70
+- Integrate closely related features into existing UI sections rather than creating separate top-level sections — keep the page structure lean by nesting sub-features where they logically belong. Confidence: 0.65
 
 # python
 - Define all helper functions before Model classes that reference them via `default_factory` or similar — Python requires the callable to exist at class definition time. Confidence: 0.70
@@ -22,4 +23,5 @@
 - Use warm colors for the accent/primary palette instead of blue. Keep gradients minimal and hover effects subtle. Confidence: 0.65
 - Light mode backgrounds should use subtle off-white, cream, or light pink tones rather than pure white. Confidence: 0.70
 - Design UI flows with the student's exam preparation journey in mind — prioritize clarity, reduce cognitive load, and make every interaction feel natural for someone deep in study mode. Confidence: 0.70
+
 

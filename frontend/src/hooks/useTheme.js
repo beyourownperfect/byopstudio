@@ -6,7 +6,7 @@ function resolveInitial() {
   try {
     const saved = localStorage.getItem(KEY);
     if (saved === "light" || saved === "dark") return saved;
-  } catch { /* no-op */ }
+  } catch { /* localStorage unavailable — browser privacy mode */ }
   if (typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: light)").matches) {
     return "light";
   }

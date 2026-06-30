@@ -66,7 +66,8 @@ export default function LectureTable() {
       if (updated && updated.completion_percent !== undefined) {
         setItems((prev) => prev.map((it) => (it.id === id ? { ...it, completion_percent: updated.completion_percent } : it)));
       }
-    } catch {
+    } catch (err) {
+      console.error("[LectureTable] Failed to save:", err);
       load();
     }
   }, load };
@@ -228,24 +229,24 @@ export default function LectureTable() {
   return (
     <div className="card-2 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border">
+      <div className="flex items-center justify-between gap-2 px-3 sm:px-5 py-2.5 sm:py-3 border-b border-border flex-wrap">
         <div className="flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-[hsl(var(--info))]" />
           <h3 className="font-semibold text-sm">Lecture Progress</h3>
           <span className="text-[10px] text-[hsl(var(--fg-muted))] mono">{items.length}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <select value={filterSubject} onChange={(e) => setFilterSubject(e.target.value)} className="bg-[hsl(var(--bg))] border border-border rounded px-2 py-1 text-[11px] outline-none focus:border-[hsl(var(--accent))]">
-            <option value="ALL">All subjects</option>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <select value={filterSubject} onChange={(e) => setFilterSubject(e.target.value)} className="bg-[hsl(var(--bg))] border border-border rounded px-1.5 py-1 text-[11px] outline-none focus:border-[hsl(var(--accent))] max-w-[100px] sm:max-w-none">
+            <option value="ALL">All</option>
             {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <input
             value={filterTopic}
             onChange={(e) => setFilterTopic(e.target.value)}
-            placeholder="Filter topic…"
-            className="bg-[hsl(var(--bg))] border border-border rounded px-2 py-1 text-[11px] w-28 outline-none focus:border-[hsl(var(--accent))]"
+            placeholder="Topic…"
+            className="bg-[hsl(var(--bg))] border border-border rounded px-1.5 py-1 text-[11px] w-20 sm:w-28 outline-none focus:border-[hsl(var(--accent))]"
           />
-          <button onClick={openAdd} className="btn-primary text-[11px] px-2 py-1 flex items-center gap-1" title="Add lecture">
+          <button onClick={openAdd} className="btn-primary text-[11px] px-2 py-1 flex items-center gap-1 shrink-0" title="Add lecture">
             <Plus className="w-3 h-3" /> Add
           </button>
         </div>

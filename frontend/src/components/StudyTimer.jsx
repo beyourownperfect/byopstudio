@@ -25,10 +25,10 @@ export default function StudyTimer() {
     try {
       const s = sessionStorage.getItem("byop.timer");
       return s ? JSON.parse(s) : null;
-    } catch { return null; }
+    } catch (err) { console.error("[StudyTimer] Failed to load persisted state:", err); return null; }
   };
   const saveState = (st) => {
-    try { sessionStorage.setItem("byop.timer", JSON.stringify(st)); } catch {}
+    try { sessionStorage.setItem("byop.timer", JSON.stringify(st)); } catch (err) { console.error("[StudyTimer] Failed to persist state:", err); }
   };
 
   const saved = loadState();
@@ -108,8 +108,8 @@ export default function StudyTimer() {
       }).then(() => {
         setSavedToast(true);
         setTimeout(() => setSavedToast(false), 3000);
-      }).catch(() => {});
-      new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gICAf39/gICAf3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f4B/f3+AgICAf3+AgH9/f3+AgICAf3+AgICAf3+AgICAf39/gICAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gID//w==").play().catch(() => {});
+      }).catch((err) => console.error("[StudyTimer] Failed to auto-log:", err));
+      new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gICAf39/gICAf3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f4B/f3+AgICAf3+AgH9/f3+AgICAf3+AgICAf3+AgICAf39/gICAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gID//w==").play().catch((err) => console.error("[StudyTimer] Audio playback failed:", err));
     }
   }, [elapsed, running, mode, totalSec, countdownMins, timerSubject, timerActivity, timerJournal, timerTopic]);
 
