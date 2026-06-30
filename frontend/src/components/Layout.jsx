@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Zap, BookOpen, Calendar, Activity, Command as CmdIcon, Menu, X, Sun, Moon } from "lucide-react";
+import { Zap, BookOpen, Calendar, Activity, Command as CmdIcon, Menu, X, Sun, Moon, Eraser } from "lucide-react";
 import { TID } from "@/lib/constants";
 import CommandPalette from "@/components/CommandPalette";
 import JanCountdown from "@/components/JanCountdown";
@@ -38,6 +38,15 @@ export default function Layout() {
   const dismissCmdHint = () => {
     localStorage.setItem("byop.cmdk_hint_seen", "1");
     setCmdHint(false);
+  };
+
+  const handleReset = () => {
+    if (!window.confirm("Reset all filters, timers, and UI state to defaults? This will not delete your data (questions, logs, settings).")) return;
+    const theme = localStorage.getItem("byop.theme");
+    localStorage.clear();
+    sessionStorage.clear();
+    if (theme) localStorage.setItem("byop.theme", theme);
+    window.location.reload();
   };
 
   return (
@@ -87,6 +96,16 @@ export default function Layout() {
               {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
+            {/* Reset button */}
+            <button
+              onClick={handleReset}
+              className="btn-ghost p-1.5 text-[hsl(var(--fg-muted))] hover:text-[hsl(var(--danger))]"
+              title="Reset all filters and UI state"
+              aria-label="Reset all"
+            >
+              <Eraser className="w-4 h-4" />
+            </button>
+
             <button
               data-testid={TID.cmdK}
               onClick={() => {
@@ -131,6 +150,10 @@ export default function Layout() {
                 </NavLink>
               );
             })}
+            <div className="w-px h-4 bg-border mx-1" />
+            <button onClick={() => { closeMobile(); handleReset(); }} className="px-3 py-2 text-xs font-semibold tracking-wider rounded inline-flex items-center gap-2 text-[hsl(var(--fg-muted))] hover:text-[hsl(var(--danger))] transition-colors">
+              <Eraser className="w-3.5 h-3.5" /> Reset all
+            </button>
           </div>
         )}
 
