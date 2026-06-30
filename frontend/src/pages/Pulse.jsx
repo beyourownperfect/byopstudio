@@ -65,30 +65,24 @@ export default function Pulse() {
   const isOnboarding = !data.has_study_today && data.overall_total === 0;
 
   return (
-    <div className="space-y-6">
-      {/* ━━━ Header ━━━ */}
-      <div className="card-2 px-4 sm:px-5 py-3 sm:py-4 space-y-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-semibold flex items-center gap-2"><Zap className="w-5 h-5 text-[hsl(var(--accent))]" /> Pulse</h1>
-              <p className="text-xs text-[hsl(var(--fg-muted))]">{fmtDateLong(data.today)}</p>
-            </div>
-            <HelpButton moduleKey="pulse" title={HELP_CONTENT.pulse.title} sections={HELP_CONTENT.pulse.sections} />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="text-right min-w-0">
-              <div className="label-x truncate">GATE in</div>
-              <div className="font-semibold mono text-base sm:text-lg">{data.days_until_exam}<span className="text-[hsl(var(--fg-muted))] text-xs ml-1">days</span></div>
-              <StudyStatus hasStudy={data.has_study_today} />
-            </div>
-            <button onClick={() => { setExamDate(data.exam_date); setDailyQ(data.targets.daily_question_target); setDailyMin(data.targets.daily_study_minutes_target); setDailyRev(data.targets.daily_revision_target); setShowSettings(true); }} className="btn-ghost p-2 hover:bg-[hsl(var(--bg-elev-2))] transition-colors shrink-0"><SettingsIcon className="w-4 h-4" /></button>
-          </div>
+    <div className="space-y-4">
+      {/* ━━━ Header — compact ━━━ */}
+      <div className="flex items-center justify-between gap-2 px-1 flex-wrap">
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h1 className="text-lg sm:text-xl font-semibold tracking-tight flex items-center gap-1.5">
+            <Zap className="w-4 h-4 text-[hsl(var(--accent))]" /> Pulse
+          </h1>
+          <span className="text-[11px] text-[hsl(var(--fg-muted))]">{fmtDateLong(data.today)}</span>
+          <span className="text-[11px] mono text-[hsl(var(--accent))] ml-1">{data.days_until_exam}d to GATE</span>
+          <HelpButton moduleKey="pulse" title={HELP_CONTENT.pulse.title} sections={HELP_CONTENT.pulse.sections} />
         </div>
-        <div className="flex justify-center sm:justify-start">
-          <StudyTimer />
+        <div className="flex items-center gap-1.5">
+          <StudyStatus hasStudy={data.has_study_today} />
+          <button onClick={() => { setExamDate(data.exam_date); setDailyQ(data.targets.daily_question_target); setDailyMin(data.targets.daily_study_minutes_target); setDailyRev(data.targets.daily_revision_target); setShowSettings(true); }} className="btn-ghost p-1.5 hover:bg-[hsl(var(--bg-elev-2))] transition-colors shrink-0"><SettingsIcon className="w-3.5 h-3.5" /></button>
         </div>
       </div>
+
+      <StudyTimer />
 
       {isOnboarding && (
         <div className="card-2-accent p-6 space-y-4" data-testid="pulse-onboarding">
@@ -112,6 +106,12 @@ export default function Pulse() {
         </div>
       )}
 
+      {/* ━━━ Execution Zone ━━━ */}
+      <div className="grid md:grid-cols-2 gap-3 p-3 rounded-lg border-l-2 border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/[0.02]">
+        <MissionCard initialItems={data.user_missions} />
+        <QueueCard />
+      </div>
+
       <DailySnapshot
         todayQ={data.today_questions}
         todayMin={data.today_minutes}
@@ -125,11 +125,7 @@ export default function Pulse() {
         minPct={data.daily_m_percent}
       />
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <MissionCard initialItems={data.user_missions} />
-        <QueueCard />
-      </div>
-
+      {/* ━━━ Analytics ━━━ */}
       <SubjectReadiness
         subjects={sortedSubjects}
         snapshot={data.preparation_snapshot}
@@ -137,9 +133,8 @@ export default function Pulse() {
         overallCompleted={data.overall_completed}
         overallTotal={data.overall_total}
         navigate={navigate}
+        weakTopics={data.weak_topics}
       />
-
-      <WeakTopicsCard weakTopics={data.weak_topics} expanded={weakExpanded} toggle={() => setWeakExpanded(!weakExpanded)} navigate={navigate} />
 
       {/* Settings modal */}
       {showSettings && (
@@ -176,7 +171,7 @@ export default function Pulse() {
   );
 }
 
-function SubjectReadiness({ subjects, snapshot, topicReadiness, overallCompleted, overallTotal, navigate }) {
+function SubjectReadiness({ subjects, snapshot, topicReadiness, overallCompleted, overallTotal, navigate, weakTopics }) {
   const [expandedSubjects, setExpandedSubjects] = useState({});
   const toggleSubject = (subj) => setExpandedSubjects((e) => ({ ...e, [subj]: !e[subj] }));
 
@@ -188,6 +183,7 @@ function SubjectReadiness({ subjects, snapshot, topicReadiness, overallCompleted
   ] : [];
 
   const totalEmpty = topicReadiness ? topicReadiness.reduce((sum, s) => sum + s.topics.filter((t) => !t.has_questions && !t.has_lectures).length, 0) : 0;
+  const hasWeakTopics = weakTopics && weakTopics.length > 0;
 
   return (
     <div className="card-2 overflow-hidden">
@@ -281,6 +277,26 @@ function SubjectReadiness({ subjects, snapshot, topicReadiness, overallCompleted
           {totalEmpty} untouched topics across all subjects
         </div>
       )}
+
+      {hasWeakTopics && (
+        <div className="border-t border-border px-5 py-3 space-y-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-[hsl(var(--warning))] font-medium">
+            <AlertTriangle className="w-3 h-3" /> Weak topics
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            {weakTopics.map((w, i) => (
+              <button
+                key={i}
+                onClick={() => navigate(`/solve/practice?mode=weak&subject=${w.subject}${w.official_topic ? `&topic=${w.official_topic}` : ""}`)}
+                className="text-left px-2.5 py-1.5 rounded border border-border hover:bg-[hsl(var(--bg-elev))] transition-colors text-[11px]"
+              >
+                <span className="font-medium">{w.subject}</span> <span className="text-[hsl(var(--fg-muted))]">{w.topic}</span>
+                <span className="ml-2 chip chip-danger text-[10px]">{w.accuracy}%</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -294,20 +310,11 @@ function ChevronRight({ className }) {
 }
 
 function StudyStatus({ hasStudy }) {
+  if (!hasStudy) return null;
   return (
-    <div className="flex items-center justify-end gap-1 mt-0.5">
-      {hasStudy ? (
-        <>
-          <CheckCircle className="w-3 h-3 text-[hsl(var(--success))]" />
-          <span className="text-[10px] text-[hsl(var(--success))]">Active today</span>
-        </>
-      ) : (
-        <>
-          <Circle className="w-3 h-3 text-[hsl(var(--fg-subtle))]" />
-          <span className="text-[10px] text-[hsl(var(--fg-subtle))]">No activity logged today</span>
-        </>
-      )}
-    </div>
+    <span className="inline-flex items-center gap-1 text-[10px] text-[hsl(var(--success))]">
+      <CheckCircle className="w-2.5 h-2.5" /> Active
+    </span>
   );
 }
 
@@ -316,7 +323,6 @@ function DailySnapshot({ todayQ, todayMin, qTarget, minTarget, sparkline, delta,
   const totalHrs = parseFloat((todayMin / 60).toFixed(1));
   const dayNames = ["Su","M","Tu","W","Th","F","Sa"];
   const dt = new Date();
-  const todayIdx = dt.getDay();
 
   const weekdayLabels = sparkline ? sparkline.map((_, i) => {
     const d = new Date(dt);
@@ -324,82 +330,54 @@ function DailySnapshot({ todayQ, todayMin, qTarget, minTarget, sparkline, delta,
     return dayNames[d.getDay()];
   }) : [];
 
-  const effortLabel = totalHrs === 0
-    ? "0h today"
-    : totalHrs < 1
-      ? `${todayMin}m today`
-      : `${totalHrs}h today`;
-
-  const trend = delta > 5 ? "↑ Gaining momentum"
-    : delta < -5 ? "↓ Slowing this week"
-    : delta !== 0 ? "Steady pace"
-    : "First day — keep going";
-
-  const attention = dueRevisions > 0 || dueRevisits > 0
-    ? `${dueRevisions > 0 ? `${dueRevisions} revisions` : ""}${dueRevisions > 0 && dueRevisits > 0 ? ", " : ""}${dueRevisits > 0 ? `${dueRevisits} revisits` : ""} due`
-    : "Nothing overdue";
-
-  const goalStatus = qPct >= 100 && minPct >= 100
-    ? "Both targets met"
-    : qPct >= 100 ? "Questions met · minutes pending"
-    : minPct >= 100 ? "Minutes met · questions pending"
-    : `${qPct}% Q · ${minPct}% min of daily target`;
+  const effortLabel = totalHrs === 0 ? "0h today" : totalHrs < 1 ? `${todayMin}m today` : `${totalHrs}h today`;
+  const statusLine = dueRevisions > 0 || dueRevisits > 0
+    ? `${dueRevisions > 0 ? `${dueRevisions} revisions due` : ""}${dueRevisions > 0 && dueRevisits > 0 ? ", " : ""}${dueRevisits > 0 ? `${dueRevisits} revisits due` : ""}`
+    : `${qPct}% Q · ${minPct}% min`;
 
   return (
-    <div className="card-2 p-5" data-testid={TID.pulseMomentum}>
-      {/* Row 1: effort + trend */}
-      <div className="flex items-baseline justify-between mb-3">
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-3xl font-bold mono">{totalHrs}h</span>
-          <span className="text-sm text-[hsl(var(--fg-muted))]">{effortLabel}</span>
+    <div className="card-2 p-4" data-testid={TID.pulseMomentum}>
+      <div className="flex items-center gap-4">
+        <div className="flex items-baseline gap-1 shrink-0">
+          <span className="text-2xl font-bold mono">{totalHrs}h</span>
+          <span className="text-[11px] text-[hsl(var(--fg-muted))]">{effortLabel}</span>
         </div>
-        <span className={`text-[11px] px-2 py-0.5 rounded-full ${delta > 5 ? "bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]" : delta < -5 ? "bg-[hsl(var(--danger))]/10 text-[hsl(var(--danger))]" : "bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg-muted))]"}`}>
-          {trend}
-        </span>
-      </div>
 
-      {/* Row 2: sparkline with today highlighted */}
-      {sparkline && sparkline.length > 0 && (
-        <div className="flex items-end gap-[2px] h-12 mb-3">
-          {sparkline.map((mins, i) => {
-            const isToday = i === sparkline.length - 1;
-            return (
-              <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                <div
-                  className={`w-full rounded-sm transition-all ${isToday ? "bg-[hsl(var(--accent))] shadow-[0_0_6px_hsl(var(--accent)/0.4)]" : "bg-[hsl(var(--accent))]/30 hover:bg-[hsl(var(--accent))]/60"}`}
-                  style={{ height: `${Math.max(3, (mins / maxSpark) * 100)}%` }}
-                  title={`${weekdayLabels[i] || ""}: ${mins}m`}
-                />
-                <span className={`text-[7px] ${isToday ? "text-[hsl(var(--accent))] font-semibold" : "text-[hsl(var(--fg-subtle))]"}`}>
-                  {weekdayLabels[i]}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        {sparkline && sparkline.length > 0 && (
+          <div className="flex-1 flex items-end gap-[2px] h-8 min-w-0">
+            {sparkline.map((mins, i) => {
+              const isToday = i === sparkline.length - 1;
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
+                  <div
+                    className={`w-full rounded-sm transition-all ${isToday ? "bg-[hsl(var(--accent))] shadow-[0_0_4px_hsl(var(--accent)/0.3)]" : "bg-[hsl(var(--accent))]/25"}`}
+                    style={{ height: `${Math.max(2, (mins / maxSpark) * 100)}%` }}
+                    title={`${weekdayLabels[i] || ""}: ${mins}m`}
+                  />
+                  <span className={`text-[7px] ${isToday ? "text-[hsl(var(--accent))] font-semibold" : "text-[hsl(var(--fg-subtle))]"}`}>
+                    {weekdayLabels[i]}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-      {/* Row 3: quick stats */}
-      <div className="grid grid-cols-3 gap-2 mb-2">
-        <div className="text-center">
-          <div className="text-sm font-semibold mono">{todayQ}<span className="text-[10px] text-[hsl(var(--fg-muted))] font-normal">/{qTarget}</span></div>
-          <div className="text-[10px] text-[hsl(var(--fg-subtle))]">Questions</div>
-        </div>
-        <div className="text-center">
-          <div className="text-sm font-semibold mono">{todayMin}<span className="text-[10px] text-[hsl(var(--fg-muted))] font-normal">/{minTarget}</span></div>
-          <div className="text-[10px] text-[hsl(var(--fg-subtle))]">Minutes</div>
-        </div>
-        <div className="text-center">
-          <div className="text-sm font-semibold mono">{dueRevisions + dueRevisits}</div>
-          <div className="text-[10px] text-[hsl(var(--fg-subtle))]">Due</div>
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-center">
+            <div className="mono text-sm font-semibold">{todayQ}<span className="text-[10px] text-[hsl(var(--fg-muted))] font-normal">/{qTarget}</span></div>
+            <div className="text-[9px] text-[hsl(var(--fg-subtle))]">Q</div>
+          </div>
+          <div className="text-center">
+            <div className="mono text-sm font-semibold">{todayMin}<span className="text-[10px] text-[hsl(var(--fg-muted))] font-normal">/{minTarget}</span></div>
+            <div className="text-[9px] text-[hsl(var(--fg-subtle))]">min</div>
+          </div>
         </div>
       </div>
-
-      {/* Row 4: insight */}
-      <div className="flex items-center gap-1.5 text-[11px]">
-        <span className="text-[hsl(var(--fg-muted))]">{attention}</span>
-        <span className="text-[hsl(var(--fg-subtle))]">·</span>
-        <span className="text-[hsl(var(--fg-muted))]">{goalStatus}</span>
+      <div className="flex items-center gap-1.5 mt-1.5 text-[10px]">
+        <span className="text-[hsl(var(--fg-muted))]">{statusLine}</span>
+        {delta > 5 && <span className="text-[hsl(var(--success))] ml-auto">↑ {delta} pts</span>}
+        {delta < -5 && <span className="text-[hsl(var(--danger))] ml-auto">↓ {Math.abs(delta)} pts</span>}
       </div>
     </div>
   );
