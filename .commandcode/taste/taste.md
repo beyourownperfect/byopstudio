@@ -23,3 +23,6 @@
 
 # design
 See [design/taste.md](design/taste.md)
+
+# development
+- When removing a feature from the user-facing UI, keep the backend endpoint/functionality intact as an internal development utility for testing and debugging. Remove the UI entry point but do not delete the underlying implementation. Confidence: 0.85
