@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Star, Play, ExternalLink } from "lucide-react";
 import { questionsApi } from "@/lib/api";
 import { SUBJECT_LABELS, TID } from "@/lib/constants";
+import { subjectColor } from "@/lib/gateSyllabus";
 import { relLabel } from "@/lib/dateUtils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
@@ -48,10 +49,12 @@ export default function Bookmarks() {
         </div>
       ) : (
         <div className="card-2 divide-y divide-border">
-          {items.map((q) => (
+          {items.map((q) => {
+            const colors = subjectColor(q.subject);
+            return (
             <div key={q.id} className="px-4 py-3 row-hover flex items-start gap-3">
               <div className="flex flex-col gap-1 items-center pt-1">
-                <span className="chip chip-accent" title={SUBJECT_LABELS[q.subject]}>{q.subject}</span>
+                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded border text-[11px] font-semibold ${colors.bg} ${colors.text} ${colors.border}`} title={SUBJECT_LABELS[q.subject]}>{q.subject}</span>
                 <span className="chip mono text-[10px]">{q.mastery ?? 0}</span>
               </div>
               <div className="flex-1 min-w-0">
@@ -73,7 +76,7 @@ export default function Bookmarks() {
                 )}
               </div>
             </div>
-          ))}
+          );})}
         </div>
       )}
     </div>

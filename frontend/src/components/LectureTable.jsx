@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { Plus, Trash2, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, BookOpen, X } from "lucide-react";
 import { lecturesApi } from "@/lib/api";
 import { SUBJECTS } from "@/lib/constants";
-import { topicsForSubject, topicLabel } from "@/lib/gateSyllabus";
+import { topicsForSubject, topicLabel, subjectColor } from "@/lib/gateSyllabus";
 
 const SORT_KEYS = {
   subject: (a, b) => (a.subject || "").localeCompare(b.subject || ""),

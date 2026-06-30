@@ -23,10 +23,21 @@ GATE_SYLLABUS = {
     "EM": {
         "label": "Engineering Mathematics",
         "topics": {
-            "discrete_mathematics": {"label": "Discrete Mathematics"},
             "linear_algebra": {"label": "Linear Algebra"},
             "calculus": {"label": "Calculus"},
             "probability_statistics": {"label": "Probability & Statistics"},
+        },
+    },
+    "DM": {
+        "label": "Discrete Mathematics",
+        "topics": {
+            "logic": {"label": "Logic"},
+            "sets_relations": {"label": "Sets & Relations"},
+            "functions": {"label": "Functions"},
+            "lattices": {"label": "Lattices"},
+            "group_theory": {"label": "Group Theory"},
+            "graph_theory": {"label": "Graph Theory"},
+            "combinatorics": {"label": "Combinatorics"},
         },
     },
     "DL": {
@@ -57,16 +68,26 @@ GATE_SYLLABUS = {
         },
     },
     "C": {
-        "label": "Programming & Data Structures",
+        "label": "C Programming",
         "topics": {
-            "c_programming": {"label": "C Programming"},
+            "programming_in_c": {"label": "Programming in C"},
+            "operators": {"label": "Operators"},
+            "loops_functions": {"label": "Loops & Functions"},
+            "arrays_c": {"label": "Arrays"},
+            "pointers": {"label": "Pointers & Pointer Arithmetic"},
+            "structures": {"label": "Structures"},
             "recursion": {"label": "Recursion"},
+        },
+    },
+    "DS": {
+        "label": "Data Structures",
+        "topics": {
             "arrays": {"label": "Arrays"},
             "linked_lists": {"label": "Linked Lists"},
             "stacks": {"label": "Stacks"},
             "queues": {"label": "Queues"},
             "trees": {"label": "Trees"},
-            "bst": {"label": "BST"},
+            "bst": {"label": "Binary Search Trees"},
             "heaps": {"label": "Heaps"},
             "graphs": {"label": "Graphs"},
         },
@@ -162,19 +183,10 @@ GATE_SYLLABUS = {
             "smtp": {"label": "SMTP"},
         },
     },
-    "DS": {
-        "label": "Algorithms & Data Structures",
-        "topics": {},
-        "note": "DS maps to C (Programming & Data Structures) + AL (Algorithms). Use the C and AL subject topics.",
-    },
 }
 
-# DM (Discrete Math) is a virtual subject — all DM topics live under EM (Engineering Mathematics).
-# Kept as virtual to preserve backward compatibility with existing data tagged subject="DM".
-# DS is in GATE_SYLLABUS with empty topics (maps to C + AL).
-VIRTUAL_SUBJECTS = {
-    "DM": {"label": "Discrete Math", "maps_to": "EM"},
-}
+# All subjects are real now — no virtual subjects remain.
+VIRTUAL_SUBJECTS = {}
 
 # Ordered subject list for backward compatibility.
 SUBJECTS = ["C", "DS", "AL", "OS", "DB", "COA", "TOC", "CD", "DL", "EM", "DM", "CN"]
@@ -182,11 +194,26 @@ SUBJECT_LABELS = {}
 for code in SUBJECTS:
     if code in GATE_SYLLABUS:
         SUBJECT_LABELS[code] = GATE_SYLLABUS[code]["label"]
-    elif code in VIRTUAL_SUBJECTS:
-        SUBJECT_LABELS[code] = VIRTUAL_SUBJECTS[code]["label"]
 
-# Real subjects (not virtual, with actual topics) for topic iteration
+# Real subjects (with actual topics) for topic iteration
 REAL_SUBJECTS = [s for s in SUBJECTS if s in GATE_SYLLABUS and GATE_SYLLABUS[s].get("topics")]
+
+# Backward-compat topic aliases: old keys → (subject, new_key).
+TOPIC_ALIASES = {
+    # Old C → new C keys
+    "c_programming": ("C", "programming_in_c"),
+    "arrays": ("C", "arrays_c"),
+    # Old composite C → now DS
+    "linked_lists": ("DS", "linked_lists"),
+    "stacks": ("DS", "stacks"),
+    "queues": ("DS", "queues"),
+    "trees": ("DS", "trees"),
+    "bst": ("DS", "bst"),
+    "heaps": ("DS", "heaps"),
+    "graphs": ("DS", "graphs"),
+    # Old EM → now DM
+    "discrete_mathematics": ("DM", "sets_relations"),
+}
 
 # Flat topic key → "SUBJCODE · Label" map
 ALL_TOPICS = {}
@@ -198,9 +225,15 @@ for subj_code, subj in GATE_SYLLABUS.items():
 
 
 def syllabus_topic_label(subject: str, topic_key: str) -> str:
-    """Return human-readable label for a topic key within a subject."""
+    """Return human-readable label for a topic key within a subject.
+    Falls back to alias lookup for backward compatibility with old keys."""
     if subject in GATE_SYLLABUS and topic_key in GATE_SYLLABUS[subject]["topics"]:
         return GATE_SYLLABUS[subject]["topics"][topic_key]["label"]
+    alias = TOPIC_ALIASES.get(topic_key)
+    if alias:
+        alias_subj, alias_key = alias
+        if alias_subj in GATE_SYLLABUS and alias_key in GATE_SYLLABUS[alias_subj]["topics"]:
+            return GATE_SYLLABUS[alias_subj]["topics"][alias_key]["label"]
     return topic_key
 
 
@@ -227,14 +260,22 @@ def match_topic(subject_code: str, free_text: str) -> str:
             return topic_key
         if topic_data["label"].lower() in normalized or normalized in topic_data["label"].lower():
             return topic_key
+    # Try aliases too
+    for alias_key, (alias_subj, alias_target) in TOPIC_ALIASES.items():
+        if alias_subj == subject_code:
+            if normalized in alias_key.replace("_", " ") or alias_key.replace("_", " ") in normalized:
+                return alias_target
     return ""
 
 
 def resolve_topic(subject_code: str, official_topic: str, free_text_topic: str) -> str:
-    """Resolve the best topic key: official_topic first, then fuzzy match free_text, then empty."""
+    """Resolve the best topic key: official_topic first, then alias resolve, then fuzzy match free_text, then empty."""
     if official_topic:
         if subject_code in GATE_SYLLABUS and official_topic in GATE_SYLLABUS[subject_code]["topics"]:
             return official_topic
+        alias = TOPIC_ALIASES.get(official_topic)
+        if alias:
+            return alias[1]
     if free_text_topic:
         return match_topic(subject_code, free_text_topic)
     return ""

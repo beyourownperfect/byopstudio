@@ -4,6 +4,7 @@ import Modal from "@/components/Modal";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
 import { questionsApi } from "@/lib/api";
+import { subjectColor } from "@/lib/gateSyllabus";
 import { fmtDate, fmtDateLong, relLabel } from "@/lib/dateUtils";
 
 /**
@@ -86,11 +87,11 @@ export default function QuestionDetailsModal({ open, onClose, questionId, onEdit
           {/* Header chips + bookmark */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="chip chip-accent">{q.subject}</span>
-              {q.topic && <span className="chip">{q.topic}</span>}
-              <span className="chip">{q.question_type}</span>
-              {q.exam_source && <span className="chip">{q.exam_source}{q.year ? ` ${q.year}` : ""}</span>}
-              <span className="chip">{q.difficulty}</span>
+              {q && <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-semibold ${subjectColor(q.subject).bg} ${subjectColor(q.subject).text} ${subjectColor(q.subject).border}`}>{q.subject}</span>}
+              {q && q.topic && <span className="chip">{q.topic}</span>}
+              {q && <span className="chip">{q.question_type}</span>}
+              {q && q.exam_source && <span className="chip">{q.exam_source}{q.year ? ` ${q.year}` : ""}</span>}
+              {q && <span className="chip">{q.difficulty}</span>}
               <span className={`chip ${masteryColor}`} title="Mastery (0–100)">
                 <Target className="w-3 h-3" /> {mastery}
               </span>

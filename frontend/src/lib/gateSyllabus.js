@@ -6,10 +6,21 @@ export const GATE_SYLLABUS = {
   "EM": {
     label: "Engineering Mathematics",
     topics: {
-      "discrete_mathematics": { label: "Discrete Mathematics" },
       "linear_algebra": { label: "Linear Algebra" },
       "calculus": { label: "Calculus" },
       "probability_statistics": { label: "Probability & Statistics" },
+    },
+  },
+  "DM": {
+    label: "Discrete Mathematics",
+    topics: {
+      "logic": { label: "Logic" },
+      "sets_relations": { label: "Sets & Relations" },
+      "functions": { label: "Functions" },
+      "lattices": { label: "Lattices" },
+      "group_theory": { label: "Group Theory" },
+      "graph_theory": { label: "Graph Theory" },
+      "combinatorics": { label: "Combinatorics" },
     },
   },
   "DL": {
@@ -40,16 +51,26 @@ export const GATE_SYLLABUS = {
     },
   },
   "C": {
-    label: "Programming & Data Structures",
+    label: "C Programming",
     topics: {
-      "c_programming": { label: "C Programming" },
+      "programming_in_c": { label: "Programming in C" },
+      "operators": { label: "Operators" },
+      "loops_functions": { label: "Loops & Functions" },
+      "arrays_c": { label: "Arrays" },
+      "pointers": { label: "Pointers & Pointer Arithmetic" },
+      "structures": { label: "Structures" },
       "recursion": { label: "Recursion" },
+    },
+  },
+  "DS": {
+    label: "Data Structures",
+    topics: {
       "arrays": { label: "Arrays" },
       "linked_lists": { label: "Linked Lists" },
       "stacks": { label: "Stacks" },
       "queues": { label: "Queues" },
       "trees": { label: "Trees" },
-      "bst": { label: "BST" },
+      "bst": { label: "Binary Search Trees" },
       "heaps": { label: "Heaps" },
       "graphs": { label: "Graphs" },
     },
@@ -145,20 +166,37 @@ export const GATE_SYLLABUS = {
       "smtp": { label: "SMTP" },
     },
   },
-  "DS": {
-    label: "Algorithms & Data Structures",
-    topics: {},
-    note: "DS maps to C (Programming & Data Structures) + AL (Algorithms). Use the C and AL subject topics.",
-  },
-  "DM": {
-    label: "Discrete Math",
-    topics: {},
-    note: "DM maps to EM (Engineering Mathematics). All Discrete Math topics live under EM.",
-  },
 };
 
-// Derived exports — canonical subject list and labels, replacing constants.js duplicates.
-// Subject order preserved for backward compatibility.
+// ─── Subject Color System ───
+// Color families group related subjects:
+//   [C, DS, AL]   blue/sky/indigo   — Programming + Data Structures + Algorithms
+//   [TOC, CD]      purple/violet     — Theory + Compilers
+//   [DL, OS, COA]  emerald/green/teal— Logic + OS + Architecture
+//   [EM]           amber             — Engineering Mathematics
+//   [DM]           stone/slate      — Discrete Mathematics
+//   [DB]           rose              — Databases
+//   [CN]           cyan              — Computer Networks
+export const SUBJECT_COLORS = {
+  "C":   { bg: "bg-blue-500/15",    text: "text-blue-600 dark:text-blue-400",     border: "border-blue-500/30",    bar: "bg-blue-500" },
+  "DS":  { bg: "bg-sky-500/15",     text: "text-sky-600 dark:text-sky-400",       border: "border-sky-500/30",     bar: "bg-sky-500" },
+  "AL":  { bg: "bg-indigo-500/15",  text: "text-indigo-600 dark:text-indigo-400", border: "border-indigo-500/30",  bar: "bg-indigo-500" },
+  "TOC": { bg: "bg-purple-500/15",  text: "text-purple-600 dark:text-purple-400", border: "border-purple-500/30",  bar: "bg-purple-500" },
+  "CD":  { bg: "bg-violet-500/15",  text: "text-violet-600 dark:text-violet-400", border: "border-violet-500/30",  bar: "bg-violet-500" },
+  "DL":  { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/30", bar: "bg-emerald-500" },
+  "OS":  { bg: "bg-green-500/15",   text: "text-green-600 dark:text-green-400",   border: "border-green-500/30",   bar: "bg-green-500" },
+  "COA": { bg: "bg-teal-500/15",    text: "text-teal-600 dark:text-teal-400",     border: "border-teal-500/30",    bar: "bg-teal-500" },
+  "EM":  { bg: "bg-amber-500/15",   text: "text-amber-600 dark:text-amber-400",   border: "border-amber-500/30",   bar: "bg-amber-500" },
+  "DM":  { bg: "bg-stone-500/15",   text: "text-stone-600 dark:text-stone-400",   border: "border-stone-500/30",   bar: "bg-stone-500" },
+  "DB":  { bg: "bg-rose-500/15",    text: "text-rose-600 dark:text-rose-400",     border: "border-rose-500/30",    bar: "bg-rose-500" },
+  "CN":  { bg: "bg-cyan-500/15",    text: "text-cyan-600 dark:text-cyan-400",     border: "border-cyan-500/30",    bar: "bg-cyan-500" },
+};
+
+export const subjectColor = (code) => {
+  return SUBJECT_COLORS[code] || { bg: "bg-[hsl(var(--accent))]/10", text: "text-[hsl(var(--accent))]", border: "border-[hsl(var(--accent))]/30", bar: "bg-[hsl(var(--accent))]" };
+};
+
+// ─── Derived exports ───
 const SUBJECTS_ORDER = ["C", "DS", "AL", "OS", "DB", "COA", "TOC", "CD", "DL", "EM", "DM", "CN"];
 
 export const SUBJECTS = SUBJECTS_ORDER;
@@ -170,7 +208,7 @@ for (const code of SUBJECTS_ORDER) {
   }
 }
 
-// Flattened topic key → label map (only real subjects, skip DS/DM virtual ones)
+// Flattened topic key => "SUBJCODE · Label" map
 export const ALL_TOPICS = {};
 for (const [subjCode, subj] of Object.entries(GATE_SYLLABUS)) {
   if (!subj.topics || Object.keys(subj.topics).length === 0) continue;
@@ -179,17 +217,33 @@ for (const [subjCode, subj] of Object.entries(GATE_SYLLABUS)) {
   }
 }
 
-// Get topic label by key
-export const topicLabel = (key) => ALL_TOPICS[key] || key;
+// Backward-compat topic aliases
+const TOPIC_ALIASES = {
+  "c_programming": "programming_in_c",
+  "arrays": "arrays_c",
+  "linked_lists": "linked_lists",
+  "stacks": "stacks",
+  "queues": "queues",
+  "trees": "trees",
+  "bst": "bst",
+  "heaps": "heaps",
+  "graphs": "graphs",
+  "discrete_mathematics": "sets_relations",
+};
 
-// Get topics for a subject, with optional OTHER fallback
+export const topicLabel = (key) => {
+  if (ALL_TOPICS[key]) return ALL_TOPICS[key];
+  const resolved = TOPIC_ALIASES[key];
+  if (resolved && ALL_TOPICS[resolved]) return ALL_TOPICS[resolved];
+  return key;
+};
+
 export const topicsForSubject = (subjCode) => {
   const subj = GATE_SYLLABUS[subjCode];
   if (!subj || !subj.topics) return [];
   return Object.entries(subj.topics).map(([key, t]) => ({ key, label: t.label }));
 };
 
-// Map a free-text topic string to the closest syllabus topic key (fuzzy match)
 export const matchTopic = (subjectCode, freeText) => {
   if (!freeText) return null;
   const topics = topicsForSubject(subjectCode);

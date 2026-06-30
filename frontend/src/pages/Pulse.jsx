@@ -4,7 +4,7 @@ import { Zap, AlertTriangle, BookOpen, Target, RotateCcw, FileText, Settings as 
 import { pulseApi, settingsApi } from "@/lib/api";
 import { SUBJECT_LABELS, TID } from "@/lib/constants";
 import { fmtDateLong } from "@/lib/dateUtils";
-import { topicLabel } from "@/lib/gateSyllabus";
+import { topicLabel, subjectColor } from "@/lib/gateSyllabus";
 import HelpButton from "@/components/HelpButton";
 import MissionCard from "@/components/MissionCard";
 import StudyTimer from "@/components/StudyTimer";
@@ -198,7 +198,7 @@ function TopicReadinessCard({ topicReadiness, navigate }) {
                 className="w-full flex items-center gap-2 py-2 text-left hover:bg-[hsl(var(--bg-elev))]/40 rounded px-2 transition-colors"
               >
                 <ChevronDown className={`w-3 h-3 text-[hsl(var(--fg-subtle))] transition-transform ${isExpanded ? "" : "-rotate-90"}`} />
-                <span className="text-xs font-semibold w-8">{subject}</span>
+                <span className={`text-xs font-semibold w-8 ${subjectColor(subject).text}`}>{subject}</span>
                 <span className="text-[11px] text-[hsl(var(--fg-muted))] flex-1 truncate">{SUBJECT_LABELS[subject]}</span>
                 <span className="text-[10px] mono text-[hsl(var(--fg-subtle))]">{done}/{topics.length} · {mastered} mastered</span>
               </button>
@@ -401,11 +401,11 @@ function SubjectCompletionCard({ subjects }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
         {subjects.map((s) => (
           <div key={s.subject} className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <span className="w-8 shrink-0 mono text-[11px]">{s.subject}</span>
+            <span className={`w-8 shrink-0 mono text-[11px] font-semibold ${subjectColor(s.subject).text}`}>{s.subject}</span>
             <span className="text-[11px] text-[hsl(var(--fg-muted))] flex-1 truncate min-w-0">{SUBJECT_LABELS[s.subject]}</span>
             <span className="text-[11px] mono text-[hsl(var(--fg-muted))] w-12 text-right shrink-0">{s.completed}/{s.total}</span>
             <div className="w-16 sm:w-20 h-1.5 bg-[hsl(var(--bg-elev-2))] rounded overflow-hidden shrink-0">
-              <div className={`h-full transition-all duration-300 ${MASTERY_COLOR(s.mastery_avg)}`} style={{ width: `${s.percent}%` }} />
+              <div className={`h-full transition-all duration-300 ${subjectColor(s.subject).bar}`} style={{ width: `${s.percent}%` }} />
             </div>
             <span className="mono text-[11px] w-8 text-right shrink-0">{s.percent}%</span>
           </div>

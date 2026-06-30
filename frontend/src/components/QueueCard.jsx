@@ -4,6 +4,7 @@ import { ArrowRight, Clock, CheckCircle2, BookOpen, RotateCcw, Target } from "lu
 import { queueApi } from "@/lib/api";
 import { relLabel } from "@/lib/dateUtils";
 import { SUBJECT_LABELS } from "@/lib/constants";
+import { subjectColor } from "@/lib/gateSyllabus";
 
 const GROUP_LABELS = {
   overdue: { label: "Overdue", color: "text-[hsl(var(--danger))]", bg: "bg-[hsl(var(--danger))]/10", border: "border-[hsl(var(--danger))]/30" },
@@ -84,7 +85,7 @@ export default function QueueCard() {
                         <div className="flex-1 min-w-0">
                           <div className="text-xs truncate">{item.title}</div>
                           <div className="text-[10px] text-[hsl(var(--fg-subtle))] flex items-center gap-1.5">
-                            {subjLabel && <span className="chip chip-accent text-[9px]">{subjLabel}</span>}
+                            {subjLabel && <span className={`inline-flex items-center px-1.5 py-px rounded border text-[9px] font-semibold ${subjectColor(item.subject).bg} ${subjectColor(item.subject).text} ${subjectColor(item.subject).border}`}>{subjLabel}</span>}
                             <span>{item.meta}</span>
                             {item.due_date && <span>· {relLabel(item.due_date)}</span>}
                           </div>

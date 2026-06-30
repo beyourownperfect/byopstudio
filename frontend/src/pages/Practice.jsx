@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Star, ChevronRight, ChevronLeft, ExternalLink, Check, X as XIcon, Clock, Play, BarChart3 } from "lucide-react";
 import { practiceApi, questionsApi } from "@/lib/api";
 import { SUBJECTS, TID } from "@/lib/constants";
-import { topicsForSubject } from "@/lib/gateSyllabus";
+import { topicsForSubject, subjectColor } from "@/lib/gateSyllabus";
 import { relLabel } from "@/lib/dateUtils";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import RevisitMenu from "@/components/RevisitMenu";
@@ -267,7 +267,7 @@ export default function Practice() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="card-2 px-5 py-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="chip chip-accent">{q.subject}</span>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-semibold ${subjectColor(q.subject).bg} ${subjectColor(q.subject).text} ${subjectColor(q.subject).border}`}>{q.subject}</span>
           {q.topic && <span className="chip">{q.topic}</span>}
           <span className="chip">{q.question_type}</span>
           {q.year && <span className="chip">{q.year}</span>}

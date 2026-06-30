@@ -4,7 +4,7 @@ import { Search, Plus, Star, Trash2, Edit3, Play, Upload, Download, ExternalLink
 import Papa from "papaparse";
 import { questionsApi, seed } from "@/lib/api";
 import { SUBJECTS, SUBJECT_LABELS, TID } from "@/lib/constants";
-import { topicsForSubject } from "@/lib/gateSyllabus";
+import { topicsForSubject, subjectColor } from "@/lib/gateSyllabus";
 import SubjectSelect from "@/components/SubjectSelect";
 import { debounce, relLabel, relDays } from "@/lib/dateUtils";
 import QuestionFormModal from "@/components/QuestionFormModal";
@@ -384,6 +384,7 @@ function RepoRow({ q, selected, search, onToggle, onBookmark, onEdit, onDelete, 
     if (window.getSelection) window.getSelection().removeAllRanges();
     onOpenDetails?.();
   };
+  const colors = subjectColor(q.subject);
   return (
     <div data-testid={TID.repoRow(q.id)}
       onDoubleClick={handleDoubleClick}
@@ -392,8 +393,8 @@ function RepoRow({ q, selected, search, onToggle, onBookmark, onEdit, onDelete, 
       }`}>
       <input data-testid={TID.repoRowCheckbox(q.id)} type="checkbox" checked={selected} onChange={onToggle} data-no-dbl className="accent-[hsl(var(--accent))]" />
 
-      {/* Subject badge - slightly stronger */}
-      <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold rounded border border-[hsl(var(--accent))]/40 bg-[hsl(var(--accent))]/10 text-[hsl(var(--accent))]" title={SUBJECT_LABELS[q.subject]}>
+      {/* Subject badge */}
+      <span className={`inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-semibold rounded border ${colors.bg} ${colors.text} ${colors.border}`} title={SUBJECT_LABELS[q.subject]}>
         {q.subject}
       </span>
 

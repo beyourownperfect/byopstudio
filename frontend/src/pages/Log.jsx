@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Plus, Trash2, Clock, ChevronDown, CheckCircle, X as XIcon, FileText, Upload, Eye, FileQuestion } from "lucide-react";
 import { logsApi, subjectCompletionApi, resourceUrl } from "@/lib/api";
 import { SUBJECTS, SUBJECT_LABELS, ACTIVITIES, TID } from "@/lib/constants";
-import { topicsForSubject, matchTopic } from "@/lib/gateSyllabus";
+import { topicsForSubject, matchTopic, subjectColor } from "@/lib/gateSyllabus";
 import { todayISO, fmtDate, fmtDuration, isoAdd } from "@/lib/dateUtils";
 import Modal from "@/components/Modal";
 import HelpButton from "@/components/HelpButton";
@@ -503,7 +503,7 @@ function CompletionTable({ completions, subjectFilter, onToggle, onExplain, subj
         const barColor = corePct >= 80 ? "bg-[hsl(var(--success))]" : corePct >= 40 ? "bg-[hsl(var(--warning))]" : "bg-[hsl(var(--danger))]";
         return (
           <div key={item.id} className="flex items-center gap-2 px-4 py-1.5 hover:bg-[hsl(var(--bg-elev))]/60 transition-colors text-[12px] border-b border-border/60 last:border-b-0 min-w-[1050px]">
-            <span className="chip chip-accent text-[11px] w-10 shrink-0">{item.subject}</span>
+            <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded border text-[11px] font-semibold ${subjectColor(item.subject).bg} ${subjectColor(item.subject).text} ${subjectColor(item.subject).border}`}>{item.subject}</span>
             {COMPLETION_MILESTONES.map((m) => (
               <button
                 key={m.key}

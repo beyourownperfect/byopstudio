@@ -1374,7 +1374,7 @@ async def pulse():
         total = await db.questions.count_documents({"subject": s})
         if total == 0:
             subject_completion.append(
-                {"subject": s, "total": 0, "completed": 0, "percent": 0}
+                {"subject": s, "total": 0, "completed": 0, "percent": 0, "mastery_avg": 0}
             )
             continue
         ids = [

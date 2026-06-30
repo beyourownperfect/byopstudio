@@ -7,6 +7,7 @@ import RevisitMenu from "@/components/RevisitMenu";
 import HelpButton from "@/components/HelpButton";
 import { HELP_CONTENT } from "@/lib/helpContent";
 import { SUBJECT_LABELS } from "@/lib/constants";
+import { subjectColor } from "@/lib/gateSyllabus";
 
 const MODES = [
   { value: "all", label: "All wrong" },
@@ -62,9 +63,11 @@ export default function Mistakes() {
         </div>
       ) : (
         <div className="card-2 divide-y divide-border">
-          {items.map((q) => (
+          {items.map((q) => {
+            const colors = subjectColor(q.subject);
+            return (
             <div key={q.id} className="px-4 py-3 row-hover flex items-start gap-3">
-              <span className="chip chip-danger" title={SUBJECT_LABELS[q.subject]}>{q.subject}</span>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[11px] font-semibold ${colors.bg} ${colors.text} ${colors.border}`} title={SUBJECT_LABELS[q.subject]}>{q.subject}</span>
               <div className="flex-1 min-w-0">
                 <div className="text-sm leading-snug line-clamp-2"><MarkdownRenderer>{q.statement}</MarkdownRenderer></div>
                 <div className="mt-1 text-[11px] text-[hsl(var(--fg-muted))]">{q.topic || "—"} · {q.question_type}</div>
@@ -74,7 +77,7 @@ export default function Mistakes() {
                 <button onClick={() => navigate(`/solve/practice?question=${q.id}`)} className="btn btn-primary"><Play className="w-3.5 h-3.5" /> Solve</button>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
     </div>
