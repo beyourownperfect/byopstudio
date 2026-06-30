@@ -464,7 +464,8 @@ Base URL: `/api`
 
 | Method | Path | Params | Response |
 |--------|------|--------|----------|
-| `GET` | `/api/pulse` | — | `{today, mission, momentum, preparation_snapshot, due_revisions, weak_topics, subject_completion, ...}` |
+| `GET` | `/api/pulse` | — | `{today, mission, momentum, preparation_snapshot, due_revisions, weak_topics, subject_completion, user_missions, ...}` (5s in-memory cache, invalidated on mutations) |
+| `GET` | `/api/pulse/topic-readiness` | — | Lazy-loaded per-topic readiness (batched queries, no per-topic DB calls) |
 | `GET` | `/api/calendar` | `?start=&end=` | `{days: [{date, study_minutes, questions_solved, ...}]}` |
 | `GET` | `/api/mistakes` | `?mode=` | `{items: [questions with SRS]}` |
 
@@ -804,11 +805,12 @@ async def pulse():
 
 Create `frontend/src/pages/Pulse.jsx`:
 - Header: date + countdown to exam
-- MissionCard (user-authored tasks, separate API)
+- MissionCard (user-authored tasks — receives pre-fetched `user_missions` from pulse response, no separate API call)
 - **Preparation Snapshot**: 4 progress bars (Subject Coverage, Question Mastery, Revision Completion, Mock Readiness)
 - 3-column: Momentum | Due Today | Today's Progress
 - Weak Topics (collapsible)
 - Subject Completion (12-row breakdown)
+- **Topic Readiness** lazy-loaded via `/api/pulse/topic-readiness` — renders after initial dashboard paint
 
 ### Phase E: Log + Timeline (~5 hours)
 

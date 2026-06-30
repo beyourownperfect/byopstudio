@@ -2,7 +2,7 @@
 
 A single-user study operating system for GATE Computer Science prep. Capture questions, solve under spaced repetition, schedule revisions, and measure momentum — all without a planner.
 
-> **Version:** v1.2 · Open source.
+> **Version:** v1.3 · Open source.
 
 ---
 
@@ -40,7 +40,7 @@ Single user, no auth, no cloud lock-in. One-click deploy to Render, backed by Mo
 
 | Layer | Tech |
 |-------|------|
-| Frontend | React 19 (CRA + craco), TailwindCSS, Radix UI primitives, lucide-react, KaTeX, react-router-dom v7 |
+| Frontend | React 19 (CRA + craco), TailwindCSS, Radix UI primitives, lucide-react, KaTeX, react-router-dom v7, @tanstack/react-query |
 | Backend | FastAPI, Motor (async MongoDB), Pydantic v2, Uvicorn |
 | Database | MongoDB (Atlas or local, falls back to in-memory mongomock) |
 | Build | Yarn (frontend), pip (backend) |
@@ -144,7 +144,7 @@ See **[DEPLOYMENT.md](./DEPLOYMENT.md)** for the full step-by-step guide.
 
 ```
 ├── backend/
-│   ├── server.py               # All routes, models, helpers, seed, SPA serving (2189 lines, 18 sections)
+│   ├── server.py               # All routes, models, helpers, seed, SPA serving (1650 lines)
 │   ├── requirements.txt
 │   ├── uploads/                # Subject resource files (Short Notes, Traversal Q&A)
 │   ├── Procfile

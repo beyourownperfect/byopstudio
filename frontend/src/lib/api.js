@@ -73,6 +73,7 @@ export const calendarApi = {
 
 export const pulseApi = {
   get: () => c.get("/pulse").then((r) => r.data),
+  topicReadiness: () => c.get("/pulse/topic-readiness").then((r) => r.data),
 };
 
 export const mistakesApi = {

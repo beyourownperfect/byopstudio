@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Play, Pause, RotateCcw, Maximize2, X, Save, CheckCircle } from "lucide-react";
 import { logsApi } from "@/lib/api";
-import { ACTIVITIES } from "@/lib/constants";
+import { ACTIVITIES, CATEGORIES, DEFAULT_CATEGORY } from "@/lib/constants";
 import { todayISO } from "@/lib/dateUtils";
 import SubjectSelect from "@/components/SubjectSelect";
 
@@ -41,6 +41,11 @@ export default function StudyTimer() {
   const [timerSubject, setTimerSubject] = useState(saved?.timerSubject || "OS");
   const [timerActivity, setTimerActivity] = useState(saved?.timerActivity || "Practice");
   const [timerTopic, setTimerTopic] = useState(saved?.timerTopic || "");
+  const [timerCategory, setTimerCategory] = useState(() => {
+    try {
+      return localStorage.getItem("byop.studyCategory") || saved?.timerCategory || DEFAULT_CATEGORY;
+    } catch { return saved?.timerCategory || DEFAULT_CATEGORY; }
+  });
   const [timerJournal, setTimerJournal] = useState("");
   const [focusOpen, setFocusOpen] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
@@ -55,8 +60,8 @@ export default function StudyTimer() {
   };
 
   useEffect(() => {
-    saveState({ mode, elapsed, totalSec, countdownMins, countdownSecs, timerSubject, timerTopic, running });
-  }, [mode, elapsed, totalSec, countdownMins, countdownSecs, timerSubject, timerTopic, running]);
+    saveState({ mode, elapsed, totalSec, countdownMins, countdownSecs, timerSubject, timerTopic, timerCategory, running });
+  }, [mode, elapsed, totalSec, countdownMins, countdownSecs, timerSubject, timerTopic, timerCategory, running]);
 
   const start = useCallback(() => {
     if (running) return;
@@ -103,6 +108,7 @@ export default function StudyTimer() {
         activity: timerActivity,
         subject: timerSubject,
         topic: timerTopic,
+        category: timerCategory,
         duration_min: minutes,
         remarks: timerJournal || `Countdown timer: ${countdownMins}m session`,
       }).then(() => {
@@ -111,7 +117,7 @@ export default function StudyTimer() {
       }).catch((err) => console.error("[StudyTimer] Failed to auto-log:", err));
       new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gICAf39/gICAf3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f4B/f3+AgICAf3+AgH9/f3+AgICAf3+AgICAf3+AgICAf39/gICAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gID//w==").play().catch((err) => console.error("[StudyTimer] Audio playback failed:", err));
     }
-  }, [elapsed, running, mode, totalSec, countdownMins, timerSubject, timerActivity, timerJournal, timerTopic]);
+  }, [elapsed, running, mode, totalSec, countdownMins, timerSubject, timerActivity, timerJournal, timerTopic, timerCategory]);
 
   const switchMode = (m) => {
     setRunning(false);
@@ -130,6 +136,7 @@ export default function StudyTimer() {
       activity: timerActivity,
       subject: timerSubject,
       topic: timerTopic,
+      category: timerCategory,
       duration_min: minutes,
       remarks:
         timerJournal ||
@@ -231,6 +238,20 @@ export default function StudyTimer() {
           className="w-[72px] px-1.5 py-0.5 text-[10px] bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] placeholder:text-[hsl(var(--fg-subtle))]/50"
           title="Topic (saved to log)"
         />
+
+        {/* Category selector */}
+        <select
+          value={timerCategory}
+          onChange={(e) => {
+            const v = e.target.value;
+            setTimerCategory(v);
+            try { localStorage.setItem("byop.studyCategory", v); } catch {}
+          }}
+          className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-1 py-0.5 text-[9px] outline-none focus:border-[hsl(var(--accent))] max-w-[72px]"
+          title="Category"
+        >
+          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
 
         {/* Time display */}
         <span
@@ -369,7 +390,7 @@ export default function StudyTimer() {
 
             {/* Activity + subject + journal */}
             <div className="mt-6 max-w-xs mx-auto space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="text-left">
                   <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Subject</label>
                   <SubjectSelect value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
@@ -382,6 +403,20 @@ export default function StudyTimer() {
                     className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
                   >
                     {ACTIVITIES.map((a) => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+                <div className="text-left">
+                  <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Category</label>
+                  <select
+                    value={timerCategory}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setTimerCategory(v);
+                      try { localStorage.setItem("byop.studyCategory", v); } catch {}
+                    }}
+                    className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
+                  >
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
               </div>

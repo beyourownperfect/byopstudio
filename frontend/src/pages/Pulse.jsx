@@ -20,6 +20,7 @@ const MASTERY_COLOR = (n) =>
 export default function Pulse() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [topicReadiness, setTopicReadiness] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [examDate, setExamDate] = useState("");
   const [dailyQ, setDailyQ] = useState(0);
@@ -29,6 +30,12 @@ export default function Pulse() {
 
   const load = async () => setData(await pulseApi.get());
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (data) {
+      pulseApi.topicReadiness().then(setTopicReadiness).catch(() => setTopicReadiness([]));
+    }
+  }, [data]);
 
   const saveSettings = async () => {
     const payload = {};
@@ -111,7 +118,7 @@ export default function Pulse() {
       {/* ━━━ Today ━━━ */}
       <SectionLabel icon={<Zap className="w-3.5 h-3.5" />} text="Today" />
       <div className="space-y-4">
-        <MissionCard />
+        <MissionCard initialItems={data.user_missions} />
         <QueueCard />
         <div className="grid md:grid-cols-2 gap-4">
           <MomentumCard momentum={data.momentum} delta={data.momentum_delta} sparkline={data.momentum_sparkline} />
@@ -131,7 +138,7 @@ export default function Pulse() {
         <PreparationSnapshot snapshot={data.preparation_snapshot} />
         <WeakTopicsCard weakTopics={data.weak_topics} expanded={weakExpanded} toggle={() => setWeakExpanded(!weakExpanded)} navigate={navigate} />
         <SubjectCompletionCard subjects={sortedSubjects} />
-        <TopicReadinessCard topicReadiness={data.topic_readiness} navigate={navigate} />
+        <TopicReadinessCard topicReadiness={topicReadiness} navigate={navigate} />
       </div>
 
       {/* Settings modal */}

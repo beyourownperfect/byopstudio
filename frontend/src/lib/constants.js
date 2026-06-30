@@ -2,6 +2,8 @@ import { SUBJECTS, SUBJECT_LABELS } from "@/lib/gateSyllabus";
 
 export { SUBJECTS, SUBJECT_LABELS };
 export const ACTIVITIES = ["Lecture", "Practice", "Revision", "Mock Test", "Reading"];
+export const CATEGORIES = ["GATE CSE", "SAP ABAP Learning", "On the Job", "Cleaning"];
+export const DEFAULT_CATEGORY = "GATE CSE";
 export const QUESTION_TYPES = ["MCQ", "MSQ", "NAT"];
 export const DIFFICULTIES = ["Easy", "Medium", "Hard"];
 export const EXAM_SOURCES = ["GATE", "ISRO", "GO DPP", "GO Weekly Quiz", "GO Subject Test", "GO Mock", "Other"];

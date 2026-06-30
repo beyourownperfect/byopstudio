@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Plus, ChevronLeft, ChevronRight, Calendar as CalIcon, ArrowRight, Clock, CheckCircle2, BookOpen, RotateCcw, Target, ListOrdered } from "lucide-react";
 import { timelineApi, calendarApi, revisitsApi, queueApi } from "@/lib/api";
-import { SUBJECT_LABELS, TID } from "@/lib/constants";
+import { SUBJECT_LABELS, CATEGORIES, TID } from "@/lib/constants";
 import { subjectColor } from "@/lib/gateSyllabus";
 import { todayISO, fmtDateLong, fmtDuration, isoAdd, startOfWeek, relLabel } from "@/lib/dateUtils";
 import TimelineEntryModal from "@/components/TimelineEntryModal";
@@ -43,6 +43,7 @@ export default function Timeline() {
   const [queue, setQueue] = useState(null);
   const [completedEntries, setCompletedEntries] = useState([]);
   const [expandedGroups, setExpandedGroups] = useState({ overdue: true, today: true, this_week: false, upcoming: false, completed: false });
+  const [categoryFilter, setCategoryFilter] = useState("All");
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (view === "daily") return { rangeStart: selectedDate, rangeEnd: selectedDate };
@@ -57,18 +58,21 @@ export default function Timeline() {
   }, [view, cursor, selectedDate]);
 
   const load = async () => {
+    const catParam = categoryFilter !== "All" ? { category: categoryFilter } : {};
     if (view === "queue") {
       const [q, t] = await Promise.all([
-        queueApi.get(),
-        timelineApi.list({ start: isoAdd(todayISO(), -30), end: todayISO() }),
+        queueApi.get(catParam),
+        timelineApi.list({ start: isoAdd(todayISO(), -30), end: todayISO(), ...catParam }),
       ]);
       setQueue(q);
       setCompletedEntries((t.items || []).filter((e) => e.completion_status === "completed"));
     } else {
       const [t, c, r] = await Promise.all([
-        timelineApi.list({ start: rangeStart, end: rangeEnd }),
-        calendarApi.range(rangeStart, rangeEnd),
-        revisitsApi.list({ start: rangeStart, end: rangeEnd }),
+        timelineApi.list({ start: rangeStart, end: rangeEnd, ...catParam }),
+        calendarApi.range(rangeStart, rangeEnd, catParam.category || undefined),
+        categoryFilter === "All" || categoryFilter === "GATE CSE"
+          ? revisitsApi.list({ start: rangeStart, end: rangeEnd })
+          : Promise.resolve({ items: [] }),
       ]);
       setEntries(t.items || []);
       setScheduledRev(t.scheduled_revisions || []);
@@ -77,7 +81,7 @@ export default function Timeline() {
     }
   };
 
-  useEffect(() => { load(); }, [rangeStart, rangeEnd, view]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [rangeStart, rangeEnd, view, categoryFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refresh = async () => {
     load();
@@ -143,6 +147,11 @@ export default function Timeline() {
             <button data-testid={TID.tlViewDaily} onClick={() => setView("daily")} className={`px-2.5 sm:px-3 py-1 rounded text-[10px] sm:text-xs ${view === "daily" ? "bg-[hsl(var(--bg-elev-2))]" : "text-[hsl(var(--fg-muted))]"}`}>Daily</button>
             <button data-testid={TID.tlViewWeekly} onClick={() => setView("weekly")} className={`px-2.5 sm:px-3 py-1 rounded text-[10px] sm:text-xs ${view === "weekly" ? "bg-[hsl(var(--bg-elev-2))]" : "text-[hsl(var(--fg-muted))]"}`}>Weekly</button>
             <button data-testid={TID.tlViewMonthly} onClick={() => setView("monthly")} className={`px-2.5 sm:px-3 py-1 rounded text-[10px] sm:text-xs ${view === "monthly" ? "bg-[hsl(var(--bg-elev-2))]" : "text-[hsl(var(--fg-muted))]"}`}>Monthly</button>
+            <span className="w-px h-4 bg-border mx-1" />
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="bg-transparent text-[10px] sm:text-[11px] outline-none px-0.5">
+              <option value="All">All</option>
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
           {view !== "queue" && (
             <>

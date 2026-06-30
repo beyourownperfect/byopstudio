@@ -55,6 +55,8 @@ from syllabus import (
 )
 
 ACTIVITIES = ["Lecture", "Practice", "Revision", "Mock Test", "Reading"]
+CATEGORIES = ["GATE CSE", "SAP ABAP Learning", "On the Job", "Cleaning"]
+DEFAULT_CATEGORY = "GATE CSE"
 SRS_INTERVALS = [1, 3, 7, 14, 30, 90]  # days
 REVISIT_TYPES = [
     "question",
@@ -252,6 +254,7 @@ class StudyLog(BaseModel):
     questions_correct: int = 0
     questions_wrong: int = 0
     remarks: str = ""
+    category: str = DEFAULT_CATEGORY
     date: str = Field(default_factory=today_iso)
     timeline_entry_id: Optional[str] = None
     created_at: str = Field(default_factory=now_iso)
@@ -262,6 +265,7 @@ class TimelineEntry(BaseModel):
     subject: str
     topic: str = ""
     official_topic: str = ""
+    category: str = DEFAULT_CATEGORY
     activity: str  # Lecture, Practice, Revision, Mock Test, Reading
     title: str
     duration_min: int = 0
@@ -393,6 +397,7 @@ async def update_settings(payload: Dict[str, Any]):
     update = {k: v for k, v in payload.items() if v is not None}
     update["updated_at"] = now_iso()
     await db.settings.update_one({"id": "singleton"}, {"$set": update}, upsert=True)
+    _pulse_cache["timestamp"] = 0  # invalidate pulse cache
     return await _get_settings()
 
 
@@ -757,6 +762,7 @@ async def submit_practice(payload: Dict[str, Any]):
         "date": today_iso(),
         "activity": "Practice",
         "subject": q["subject"],
+        "category": "GATE CSE",
         "auto": True,
     }
     existing = await db.study_logs.find_one(log_filter, {"_id": 0})
@@ -791,7 +797,7 @@ async def submit_practice(payload: Dict[str, Any]):
     # Upsert daily practice timeline entry (aggregate per subject per day)
     tl_date = today_iso()
     existing_tl = await db.timeline.find_one(
-        {"date": tl_date, "subject": q["subject"], "activity": "Practice"}, {"_id": 0}
+        {"date": tl_date, "subject": q["subject"], "activity": "Practice", "category": "GATE CSE"}, {"_id": 0}
     )
     if existing_tl:
         await db.timeline.update_one(
@@ -819,6 +825,7 @@ async def submit_practice(payload: Dict[str, Any]):
         await db.timeline.insert_one(tl.model_dump())
 
     updated_srs = await db.srs.find_one({"question_id": qid}, {"_id": 0})
+    _pulse_cache["timestamp"] = 0  # invalidate pulse cache
     return {
         "attempt": attempt.model_dump(),
         "srs": updated_srs,
@@ -866,6 +873,7 @@ async def create_log(payload: Dict[str, Any]):
             subject=log.subject,
             topic=log.topic,
             official_topic=log_ot,
+            category=log.category,
             activity=log.activity,
             title=log.remarks or syllabus_title(log.subject, log_ot, log.activity),
             duration_min=log.duration_min,
@@ -885,7 +893,8 @@ async def create_log(payload: Dict[str, Any]):
 
 @api_router.get("/study-logs")
 async def list_logs(
-    start: Optional[str] = None, end: Optional[str] = None, limit: int = 1000
+    start: Optional[str] = None, end: Optional[str] = None, limit: int = 1000,
+    category: Optional[str] = None,
 ):
     query: Dict[str, Any] = {}
     if start or end:
@@ -895,6 +904,8 @@ async def list_logs(
         if end:
             rng["$lte"] = end
         query["date"] = rng
+    if category:
+        query["category"] = category
     docs = (
         await db.study_logs.find(query, {"_id": 0})
         .sort("created_at", -1)
@@ -943,6 +954,7 @@ async def create_timeline_entry(payload: Dict[str, Any]):
             activity=entry.activity,
             subject=entry.subject,
             topic=entry.topic,
+            category=entry.category,
             duration_min=entry.duration_min,
             questions_attempted=entry.questions_solved,
             remarks=entry.title,
@@ -956,7 +968,8 @@ async def create_timeline_entry(payload: Dict[str, Any]):
 
 @api_router.get("/timeline")
 async def list_timeline(
-    start: Optional[str] = None, end: Optional[str] = None, limit: int = 1000
+    start: Optional[str] = None, end: Optional[str] = None, limit: int = 1000,
+    category: Optional[str] = None,
 ):
     query: Dict[str, Any] = {}
     if start or end:
@@ -966,6 +979,8 @@ async def list_timeline(
         if end:
             rng["$lte"] = end
         query["date"] = rng
+    if category:
+        query["category"] = category
     docs = await db.timeline.find(query, {"_id": 0}).sort("date", -1).to_list(limit)
 
     # Also include entries whose scheduled_revisions intersect the range
@@ -975,6 +990,8 @@ async def list_timeline(
         sched_query: Dict[str, Any] = {
             "scheduled_revisions": {"$exists": True, "$ne": []}
         }
+        if category:
+            sched_query["category"] = category
         if start and end:
             sched_query["scheduled_revisions"] = {
                 "$elemMatch": {"$gte": start, "$lte": end}
@@ -1064,6 +1081,7 @@ async def schedule_revision(entry_id: str, payload: Dict[str, Any]):
     await db.timeline.update_one(
         {"id": entry_id}, {"$set": {"scheduled_revisions": rev}}
     )
+    _pulse_cache["timestamp"] = 0  # invalidate pulse cache
     return {"scheduled_revisions": rev}
 
 
@@ -1082,11 +1100,13 @@ async def complete_revision(entry_id: str, payload: Dict[str, Any]):
         activity="Revision",
         subject=e["subject"],
         topic=e["topic"],
+        category=e.get("category", "GATE CSE"),
         duration_min=0,
         remarks=f"Revised: {e['title']}",
         timeline_entry_id=entry_id,
     )
     await db.study_logs.insert_one(log.model_dump())
+    _pulse_cache["timestamp"] = 0  # invalidate pulse cache
     return {"completed_revisions": completed}
 
 
@@ -1178,26 +1198,53 @@ async def delete_revisit(rid: str):
     return {"success": True}
 
 
-async def _compute_topic_readiness() -> list:
+async def _compute_topic_readiness(srs_lookup: dict = None) -> list:
     """Per-subject topic-level readiness: questions, lectures, PYQs, completion %, mastery.
-    Highlights empty topics so users see what's untouched."""
-    result = []
+    Highlights empty topics so users see what's untouched.
+
+    Optimised: 2 batched queries (questions + lectures) + pre-fetched srs_lookup."""
+    subject_topics = {}
     for subj in REAL_SUBJECTS:
         subj_data = GATE_SYLLABUS.get(subj, {})
         topics = subj_data.get("topics", {})
-        if not topics:
-            continue
+        if topics:
+            subject_topics[subj] = list(topics.items())
+
+    if not subject_topics:
+        return []
+
+    all_subs = list(subject_topics.keys())
+
+    all_qs = await db.questions.find({"subject": {"$in": all_subs}}, {"_id": 0, "id": 1, "subject": 1, "official_topic": 1, "year": 1}).to_list(50000)
+    all_lectures = await db.lectures.find({"subject": {"$in": all_subs}}, {"_id": 0, "subject": 1, "official_topic": 1}).to_list(50000)
+
+    if srs_lookup is None:
+        all_qids_for_topic = [q["id"] for q in all_qs]
+        srs_docs = await db.srs.find({"question_id": {"$in": all_qids_for_topic}}, {"_id": 0}).to_list(100000) if all_qids_for_topic else []
+        srs_lookup = {}
+        for s in srs_docs:
+            srs_lookup[s["question_id"]] = s
+
+    result = []
+    for subj in all_subs:
         topic_rows = []
-        for topic_key, topic_data in topics.items():
+        for topic_key, topic_data in subject_topics[subj]:
             label = topic_data["label"]
-            q_count = await db.questions.count_documents({"subject": subj, "official_topic": topic_key})
-            lec_count = await db.lectures.count_documents({"subject": subj, "official_topic": topic_key})
-            pyq_count = await db.questions.count_documents({"subject": subj, "official_topic": topic_key, "year": {"$ne": None}})
-            qids = [q["id"] async for q in db.questions.find({"subject": subj, "official_topic": topic_key}, {"_id": 0, "id": 1})]
-            srs_docs = await db.srs.find({"question_id": {"$in": qids}}, {"_id": 0}).to_list(5000) if qids else []
-            mastery_vals = [_compute_mastery(s) for s in srs_docs if s.get("total_attempts", 0) > 0]
+            topic_qs = [q for q in all_qs if q["subject"] == subj and q.get("official_topic") == topic_key]
+            q_count = len(topic_qs)
+            lec_count = sum(1 for l in all_lectures if l["subject"] == subj and l.get("official_topic") == topic_key)
+            pyq_count = sum(1 for q in topic_qs if q.get("year") is not None)
+
+            mastery_vals = []
+            completed = 0
+            for q in topic_qs:
+                s = srs_lookup.get(q["id"])
+                if s and s.get("total_attempts", 0) > 0:
+                    mastery_vals.append(_compute_mastery(s))
+                if _is_question_completed(s):
+                    completed += 1
+
             mastery_avg = round(sum(mastery_vals) / len(mastery_vals), 1) if mastery_vals else 0
-            completed = sum(1 for s in srs_docs if _is_question_completed(s))
             percent = round(completed / q_count * 100, 1) if q_count else 0
             topic_rows.append({
                 "key": topic_key, "label": label,
@@ -1210,17 +1257,26 @@ async def _compute_topic_readiness() -> list:
 
 
 # ============================ CALENDAR / PULSE =====================
-async def _aggregate_day(d_iso: str) -> dict:
-    logs = await db.study_logs.find({"date": d_iso}, {"_id": 0}).to_list(1000)
+async def _aggregate_day(d_iso: str, category: Optional[str] = None) -> dict:
+    log_query: Dict[str, Any] = {"date": d_iso}
+    if category:
+        log_query["category"] = category
+    logs = await db.study_logs.find(log_query, {"_id": 0}).to_list(1000)
     revisits_completed = await db.revisits.count_documents(
         {"completed": True, "completed_at": {"$regex": f"^{d_iso}"}}
     )
     revisits_pending = await db.revisits.count_documents(
         {"completed": False, "revisit_date": d_iso}
     )
-    timeline_count = await db.timeline.count_documents({"date": d_iso})
+    timeline_count_query: Dict[str, Any] = {"date": d_iso}
+    if category:
+        timeline_count_query["category"] = category
+    timeline_count = await db.timeline.count_documents(timeline_count_query)
     scheduled_today = 0
-    async for _e in db.timeline.find({"scheduled_revisions": d_iso}, {"_id": 0}):
+    sched_query: Dict[str, Any] = {"scheduled_revisions": d_iso}
+    if category:
+        sched_query["category"] = category
+    async for _e in db.timeline.find(sched_query, {"_id": 0}):
         scheduled_today += 1
     total_minutes = sum(log.get("duration_min", 0) for log in logs)
     qs_solved = sum(log.get("questions_attempted", 0) for log in logs)
@@ -1237,13 +1293,13 @@ async def _aggregate_day(d_iso: str) -> dict:
 
 
 @api_router.get("/calendar")
-async def calendar(start: str, end: str):
+async def calendar(start: str, end: str, category: Optional[str] = None):
     d0 = datetime.strptime(start, "%Y-%m-%d").date()
     d1 = datetime.strptime(end, "%Y-%m-%d").date()
     days = []
     cur = d0
     while cur <= d1:
-        days.append(await _aggregate_day(cur.isoformat()))
+        days.append(await _aggregate_day(cur.isoformat(), category))
         cur += timedelta(days=1)
     return {"days": days}
 
@@ -1287,8 +1343,16 @@ async def _momentum_score() -> int:
     return raw["score"]
 
 
+_pulse_cache = {"data": None, "timestamp": 0}
+_PULSE_CACHE_TTL = 5  # seconds
+
+
 @api_router.get("/pulse")
 async def pulse():
+    now = int(datetime.now(timezone.utc).timestamp())
+    if _pulse_cache["data"] is not None and (now - _pulse_cache["timestamp"]) < _PULSE_CACHE_TTL:
+        return _pulse_cache["data"]
+
     today = today_iso()
     settings = await _get_settings()
 
@@ -1318,7 +1382,7 @@ async def pulse():
     )
 
     # Today's logs
-    today_logs = await db.study_logs.find({"date": today}, {"_id": 0}).to_list(1000)
+    today_logs = await db.study_logs.find({"date": today, "category": "GATE CSE"}, {"_id": 0}).to_list(1000)
     today_qs = sum(log.get("questions_attempted", 0) for log in today_logs)
     today_minutes = sum(log.get("duration_min", 0) for log in today_logs)
 
@@ -1365,39 +1429,48 @@ async def pulse():
     else:
         weak_topics = []
 
-    # Subject completion: a question is "completed" after 1 correct solve + 2 successful
-    # SRS revisions (see _is_question_completed). Percent = completed / total per subject.
-    subject_completion = []
+    # Subject completion: single batched query — compute in-memory using all_qs + srs_map
+    # fetched once below (shared with question_mastery, topic_readiness)
+    overall_all_qs = await db.questions.find({"subject": {"$in": SUBJECTS}}, {"_id": 0, "id": 1, "subject": 1}).to_list(50000)
+    all_qids = [q["id"] for q in overall_all_qs]
+    all_srs_docs = await db.srs.find({"question_id": {"$in": all_qids}}, {"_id": 0}).to_list(100000) if all_qids else []
+    srs_lookup = {}
+    for s_doc in all_srs_docs:
+        srs_lookup[s_doc["question_id"]] = s_doc
+
+    # Per-subject grouping
+    subj_total = {s: 0 for s in SUBJECTS}
+    subj_completed = {s: 0 for s in SUBJECTS}
+    subj_mastery_sums = {s: 0.0 for s in SUBJECTS}
+    subj_mastery_counts = {s: 0 for s in SUBJECTS}
     overall_total = 0
     overall_completed = 0
+    for q in overall_all_qs:
+        s = q["subject"]
+        subj_total[s] += 1
+        overall_total += 1
+        srs_rec = srs_lookup.get(q["id"])
+        if _is_question_completed(srs_rec):
+            subj_completed[s] += 1
+            overall_completed += 1
+        if srs_rec and srs_rec.get("total_attempts", 0) > 0:
+            mastery = _compute_mastery(srs_rec)
+            subj_mastery_sums[s] += mastery
+            subj_mastery_counts[s] += 1
+
+    subject_completion = []
     for s in SUBJECTS:
-        total = await db.questions.count_documents({"subject": s})
-        if total == 0:
-            subject_completion.append(
-                {"subject": s, "total": 0, "completed": 0, "percent": 0, "mastery_avg": 0}
-            )
-            continue
-        ids = [
-            q["id"]
-            async for q in db.questions.find({"subject": s}, {"_id": 0, "id": 1})
-        ]
-        srs_records = await db.srs.find(
-            {"question_id": {"$in": ids}}, {"_id": 0}
-        ).to_list(10000)
-        completed = sum(1 for s_rec in srs_records if _is_question_completed(s_rec))
-        mastery_vals_sub = [_compute_mastery(s_rec) for s_rec in srs_records if s_rec.get("total_attempts", 0) > 0]
-        mastery_avg = round(sum(mastery_vals_sub) / len(mastery_vals_sub), 1) if mastery_vals_sub else 0
-        overall_total += total
-        overall_completed += completed
-        subject_completion.append(
-            {
-                "subject": s,
-                "total": total,
-                "completed": completed,
-                "percent": round(completed / total * 100, 1),
-                "mastery_avg": mastery_avg,
-            }
-        )
+        total = subj_total[s]
+        completed = subj_completed[s]
+        cnt = subj_mastery_counts[s]
+        mastery_avg = round(subj_mastery_sums[s] / cnt, 1) if cnt else 0
+        subject_completion.append({
+            "subject": s,
+            "total": total,
+            "completed": completed,
+            "percent": round(completed / total * 100, 1) if total else 0,
+            "mastery_avg": mastery_avg,
+        })
     overall_completion_percent = (
         round(overall_completed / overall_total * 100, 1) if overall_total else 0
     )
@@ -1424,7 +1497,7 @@ async def pulse():
     # Revision readiness: % of due revisions completed in last 7d
     last_7 = [(date.today() - timedelta(days=i)).isoformat() for i in range(7)]
     completed_rev_7 = await db.study_logs.count_documents(
-        {"activity": "Revision", "date": {"$in": last_7}}
+        {"activity": "Revision", "date": {"$in": last_7}, "category": "GATE CSE"}
     )
     revision_readiness = min(100, completed_rev_7 * 10)
 
@@ -1432,22 +1505,21 @@ async def pulse():
     avg_sub = sum(s["percent"] for s in subject_completion) / max(
         1, len([s for s in subject_completion if s["total"] > 0])
     )
-    mock_count = await db.study_logs.count_documents({"activity": "Mock Test"})
+    mock_count = await db.study_logs.count_documents({"activity": "Mock Test", "category": "GATE CSE"})
     mock_readiness = round(min(100, avg_sub * 0.6 + min(40, mock_count * 5)), 1)
     mock_tests_exist = mock_count > 0
 
-    # Question Mastery: average _compute_mastery() across all questions with attempts
-    all_srs = await db.srs.find({}, {"_id": 0}).to_list(50000)
-    mastery_vals = [_compute_mastery(s) for s in all_srs if s.get("total_attempts", 0) > 0]
+    # Question Mastery: computed from already-fetched srs_lookup
+    mastery_vals = [_compute_mastery(s) for s in srs_lookup.values() if s.get("total_attempts", 0) > 0]
     question_mastery = round(sum(mastery_vals) / len(mastery_vals), 1) if mastery_vals else 0
 
     # Momentum: this week + last week + 7-day sparkline
     today_dt = date.today()
     this_week_dates = [(today_dt - timedelta(days=i)).isoformat() for i in range(7)]
     last_week_dates = [(today_dt - timedelta(days=i + 7)).isoformat() for i in range(7)]
-    logs_this = await db.study_logs.find({"date": {"$in": this_week_dates}}, {"_id": 0}).to_list(5000)
+    logs_this = await db.study_logs.find({"date": {"$in": this_week_dates}, "category": "GATE CSE"}, {"_id": 0}).to_list(5000)
     raw_this = await _momentum_raw(logs_this)
-    logs_last = await db.study_logs.find({"date": {"$in": last_week_dates}}, {"_id": 0}).to_list(5000)
+    logs_last = await db.study_logs.find({"date": {"$in": last_week_dates}, "category": "GATE CSE"}, {"_id": 0}).to_list(5000)
     raw_last = await _momentum_raw(logs_last)
     momentum = raw_this["score"]
     momentum_last_week = raw_last["score"]
@@ -1537,7 +1609,7 @@ async def pulse():
         .to_list(50)
     )
 
-    return {
+    result = {
         "today": today,
         "mission": mission,
         "user_missions": user_missions,
@@ -1556,7 +1628,6 @@ async def pulse():
         "overall_completion_percent": overall_completion_percent,
         "overall_completed": overall_completed,
         "overall_total": overall_total,
-        "topic_readiness": await _compute_topic_readiness(),
         "pyq_percent": pyq_percent,
         "pyq_done": pyq_done,
         "pyq_total": pyq_total,
@@ -1575,6 +1646,19 @@ async def pulse():
             "daily_study_minutes_target": settings["daily_study_minutes_target"],
         },
     }
+    _pulse_cache["data"] = result
+    _pulse_cache["timestamp"] = now
+    return result
+
+
+# REMOVED from pulse response — served via /api/pulse/topic-readiness for lazy loading:
+# "topic_readiness": await _compute_topic_readiness(srs_lookup),
+
+
+# ============================ TOPIC READINESS =======================
+@api_router.get("/pulse/topic-readiness")
+async def pulse_topic_readiness():
+    return await _compute_topic_readiness()
 
 
 # ============================ USER MISSIONS ========================
@@ -1650,7 +1734,7 @@ async def reorder_user_missions(payload: Dict[str, List[str]]):
 
 # ============================ EXECUTION QUEUE =======================
 @api_router.get("/queue")
-async def execution_queue():
+async def execution_queue(category: Optional[str] = None):
     """Aggregate SRS revisions, timeline scheduled revisions, revisits, and
     user missions into a single prioritized execution queue.
 
@@ -1660,38 +1744,41 @@ async def execution_queue():
     today = today_iso()
     dt = date.today()
     week_end = (dt + timedelta(days=(6 - dt.weekday()))).isoformat()
+    is_gate = not category or category == "GATE CSE"
 
     items = []
 
-    # ── SRS revisions ──
-    due_srs = (
-        await db.srs.find({"next_review_date": {"$lte": week_end}}, {"_id": 0})
-        .sort("next_review_date", 1)
-        .to_list(500)
-    )
-    if due_srs:
-        qids = [s["question_id"] for s in due_srs]
-        qs = await db.questions.find({"id": {"$in": qids}}, {"_id": 0, "id": 1, "subject": 1, "topic": 1, "statement": 1, "question_type": 1}).to_list(500)
-        qmap = {q["id"]: q for q in qs}
-        for s in due_srs:
-            q = qmap.get(s["question_id"])
-            if not q:
-                continue
-            items.append({
-                "id": f"srs-{s['id']}",
-                "kind": "srs",
-                "subject": q.get("subject", ""),
-                "topic": q.get("topic", ""),
-                "title": (q.get("statement", "") or "")[:100],
-                "due_date": s["next_review_date"],
-                "link": f"/solve/practice?mode=due&subject={q.get('subject', '')}",
-                "meta": f"SRS · {q.get('question_type', '')}",
-            })
+    # ── SRS revisions (GATE CSE only) ──
+    if is_gate:
+        due_srs = (
+            await db.srs.find({"next_review_date": {"$lte": week_end}}, {"_id": 0})
+            .sort("next_review_date", 1)
+            .to_list(500)
+        )
+        if due_srs:
+            qids = [s["question_id"] for s in due_srs]
+            qs = await db.questions.find({"id": {"$in": qids}}, {"_id": 0, "id": 1, "subject": 1, "topic": 1, "statement": 1, "question_type": 1}).to_list(500)
+            qmap = {q["id"]: q for q in qs}
+            for s in due_srs:
+                q = qmap.get(s["question_id"])
+                if not q:
+                    continue
+                items.append({
+                    "id": f"srs-{s['id']}",
+                    "kind": "srs",
+                    "subject": q.get("subject", ""),
+                    "topic": q.get("topic", ""),
+                    "title": (q.get("statement", "") or "")[:100],
+                    "due_date": s["next_review_date"],
+                    "link": f"/solve/practice?mode=due&subject={q.get('subject', '')}",
+                    "meta": f"SRS · {q.get('question_type', '')}",
+                })
 
     # ── Timeline scheduled revisions ──
-    tl_with_sched = await db.timeline.find(
-        {"scheduled_revisions": {"$exists": True, "$ne": []}}, {"_id": 0}
-    ).to_list(2000)
+    tl_query: Dict[str, Any] = {"scheduled_revisions": {"$exists": True, "$ne": []}}
+    if category:
+        tl_query["category"] = category
+    tl_with_sched = await db.timeline.find(tl_query, {"_id": 0}).to_list(2000)
     for tle in tl_with_sched:
         completed = set(tle.get("completed_revisions", []))
         for rd in tle.get("scheduled_revisions", []):
@@ -1707,24 +1794,25 @@ async def execution_queue():
                 "meta": "Timeline revision",
             })
 
-    # ── Revisit items ──
-    revisit_items = (
-        await db.revisits.find(
-            {"completed": False, "revisit_date": {"$lte": week_end}}, {"_id": 0}
+    # ── Revisit items (GATE CSE only) ──
+    if is_gate:
+        revisit_items = (
+            await db.revisits.find(
+                {"completed": False, "revisit_date": {"$lte": week_end}}, {"_id": 0}
+            )
+            .sort("revisit_date", 1)
+            .to_list(200)
         )
-        .sort("revisit_date", 1)
-        .to_list(200)
-    )
-    for rv in revisit_items:
-        items.append({
-            "id": f"revisit-{rv['id']}",
-            "kind": "revisit",
-            "subject": rv.get("item_subject") or "",
-            "title": rv.get("item_title", "Revisit item"),
-            "due_date": rv["revisit_date"],
-            "link": "/solve/repository?filter=revisit_today",
-            "meta": rv.get("item_type", "Revisit"),
-        })
+        for rv in revisit_items:
+            items.append({
+                "id": f"revisit-{rv['id']}",
+                "kind": "revisit",
+                "subject": rv.get("item_subject") or "",
+                "title": rv.get("item_title", "Revisit item"),
+                "due_date": rv["revisit_date"],
+                "link": "/solve/repository?filter=revisit_today",
+                "meta": rv.get("item_type", "Revisit"),
+            })
 
     # ── Incomplete user missions ──
     missions = (
@@ -2179,6 +2267,18 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+
+@app.on_event("startup")
+async def startup_migration():
+    await db.study_logs.update_many(
+        {"category": {"$exists": False}},
+        {"$set": {"category": "GATE CSE"}}
+    )
+    await db.timeline.update_many(
+        {"category": {"$exists": False}},
+        {"$set": {"category": "GATE CSE"}}
+    )
 
 
 @app.on_event("shutdown")

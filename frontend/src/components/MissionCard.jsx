@@ -5,9 +5,9 @@ import {
 } from "lucide-react";
 import { userMissionsApi } from "@/lib/api";
 
-export default function MissionCard() {
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function MissionCard({ initialItems }) {
+  const [items, setItems] = useState(initialItems || []);
+  const [loading, setLoading] = useState(!initialItems);
   const [newTitle, setNewTitle] = useState("");
   const [editing, setEditing] = useState(null);
 
@@ -17,7 +17,9 @@ export default function MissionCard() {
     setItems(res.items || []);
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!initialItems) load();
+  }, [initialItems]);
 
   const add = async (e) => {
     e?.preventDefault();

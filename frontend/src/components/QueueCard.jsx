@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Clock, CheckCircle2, BookOpen, RotateCcw, Target } from "lucide-react";
 import { queueApi } from "@/lib/api";
 import { relLabel } from "@/lib/dateUtils";
@@ -22,12 +23,32 @@ const KIND_ICONS = {
 
 export default function QueueCard() {
   const navigate = useNavigate();
-  const [queue, setQueue] = useState(null);
+  const { data: queue, isLoading, isError } = useQuery({
+    queryKey: ["queue"],
+    queryFn: () => queueApi.get(),
+    staleTime: 60_000,
+  });
   const [expanded, setExpanded] = useState({ overdue: true, today: true, this_week: false, upcoming: false });
 
-  useEffect(() => {
-    queueApi.get().then(setQueue).catch((err) => console.error("[QueueCard] Failed to load queue:", err));
-  }, []);
+  if (isLoading) {
+    return (
+      <div className="card-2 p-5">
+        <div className="skeleton h-20" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="card-2 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Target className="w-4 h-4 text-[hsl(var(--fg-muted))]" />
+          <h3 className="font-semibold text-sm">What should I do next?</h3>
+        </div>
+        <p className="text-sm text-[hsl(var(--fg-subtle))]">Could not load execution queue.</p>
+      </div>
+    );
+  }
 
   if (!queue || queue.total === 0) {
     return (

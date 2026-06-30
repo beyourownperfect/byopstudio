@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Trash2, Clock, ChevronDown, CheckCircle, X as XIcon, FileText, Upload, Eye, FileQuestion } from "lucide-react";
 import { logsApi, subjectCompletionApi, resourceUrl } from "@/lib/api";
-import { SUBJECTS, SUBJECT_LABELS, ACTIVITIES, TID } from "@/lib/constants";
+import { SUBJECTS, SUBJECT_LABELS, ACTIVITIES, CATEGORIES, DEFAULT_CATEGORY, TID } from "@/lib/constants";
 import { topicsForSubject, matchTopic, subjectColor } from "@/lib/gateSyllabus";
 import { todayISO, fmtDate, fmtDuration, isoAdd } from "@/lib/dateUtils";
 import Modal from "@/components/Modal";
@@ -15,6 +15,7 @@ import { HELP_CONTENT } from "@/lib/helpContent";
 const emptyForm = {
   date: todayISO(), activity: "Practice", subject: "OS", topic: "", official_topic: "",
   duration_min: 30, questions_attempted: 0, questions_correct: 0, questions_wrong: 0, remarks: "",
+  category: DEFAULT_CATEGORY,
 };
 
 function parseTimerState() {
@@ -50,6 +51,7 @@ export default function Log() {
   const [viewerUrl, setViewerUrl] = useState("");
   const [viewerIsPdf, setViewerIsPdf] = useState(false);
   const [viewerContent, setViewerContent] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
 
   // Inline edit state for daily log rows
   const [editingLogId, setEditingLogId] = useState(null);
@@ -62,7 +64,9 @@ export default function Log() {
     if (view === "daily") start = todayISO();
     else if (view === "weekly") start = isoAdd(todayISO(), -7);
     else start = isoAdd(todayISO(), -30);
-    const res = await logsApi.list({ start });
+    const params = { start };
+    if (categoryFilter !== "All") params.category = categoryFilter;
+    const res = await logsApi.list(params);
     setLogs(res.items || []);
   };
 
@@ -71,7 +75,7 @@ export default function Log() {
     setCompletions(res.items || []);
   };
 
-  useEffect(() => { load(); }, [view]); // eslint-disable-line
+  useEffect(() => { load(); }, [view, categoryFilter]); // eslint-disable-line
   useEffect(() => {
     const poll = setInterval(() => setTimerState(parseTimerState()), 1000);
     return () => clearInterval(poll);
@@ -139,6 +143,7 @@ export default function Log() {
   const submit = async () => {
     const payload = { ...form, duration_min: Number(form.duration_min) };
     payload.official_topic = form.official_topic || matchTopic(form.subject, form.topic) || "";
+    try { localStorage.setItem("byop.studyCategory", form.category); } catch {}
     await logsApi.create(payload);
     setOpen(false);
     setForm(emptyForm);
@@ -229,14 +234,23 @@ export default function Log() {
             </div>
             <HelpButton moduleKey="log" title={HELP_CONTENT.log.title} sections={HELP_CONTENT.log.sections} />
           </div>
-          <button data-testid={TID.logNewBtn} onClick={() => setOpen(true)} className="btn btn-primary text-xs"><Plus className="w-3.5 h-3.5" /> Log session</button>
+          <button data-testid={TID.logNewBtn} onClick={() => {
+            const c = localStorage.getItem("byop.studyCategory") || DEFAULT_CATEGORY;
+            setForm({ ...emptyForm, category: c });
+            setOpen(true);
+          }} className="btn btn-primary text-xs"><Plus className="w-3.5 h-3.5" /> Log session</button>
         </div>
-        <div className="card-1 p-0.5 flex items-center text-xs self-start">
+        <div className="card-1 p-0.5 flex items-center gap-3 text-xs self-start">
           {["daily", "weekly", "monthly"].map((v) => (
             <button key={v} onClick={() => setView(v)} className={`px-3 py-1 rounded transition-colors ${view === v ? "bg-[hsl(var(--bg-elev-2))] text-[hsl(var(--fg))]" : "text-[hsl(var(--fg-muted))]"}`}>
               {v}
             </button>
           ))}
+          <span className="w-px h-4 bg-border" />
+          <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="bg-transparent text-[11px] outline-none">
+            <option value="All">All categories</option>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
         </div>
       </div>
 
@@ -261,11 +275,10 @@ export default function Log() {
         <SumCard label="Accuracy" value={totalQs ? `${Math.round(totalCorrect / totalQs * 100)}%` : "—"} />
       </div>
 
-      {/* ===== Lecture Progress ===== */}
-      <LectureTable />
-
-      {/* ===== Subject Completion (collapsible, tabular) ===== */}
-      <div className="card-2 overflow-hidden">
+      {!categoryFilter || categoryFilter === "All" || categoryFilter === "GATE CSE" ? (
+        <>
+          <LectureTable />
+          <div className="card-2 overflow-hidden">
         <button type="button" onClick={() => setCompletionExpanded(!completionExpanded)}
           className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-[hsl(var(--bg-elev))]/60 transition-colors"
         >
@@ -301,6 +314,8 @@ export default function Log() {
           </div>
         )}
       </div>
+        </>
+      ) : null}
 
       {/* ===== Daily Study Logs ===== */}
       {dates.length === 0 ? (
@@ -419,7 +434,14 @@ export default function Log() {
             <div><label className="label-x">Activity</label><select data-testid={TID.logFormActivity} value={form.activity} onChange={(e) => setForm({ ...form, activity: e.target.value })} className="input mt-1">{ACTIVITIES.map((a) => <option key={a} value={a}>{a}</option>)}</select></div>
             <div><label className="label-x">Subject</label><SubjectSelect data-testid={TID.logFormSubject} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="input mt-1" /></div>
           </div>
-          <div><label className="label-x">Topic</label><input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} className="input mt-1" placeholder="e.g. Trees" /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label-x">Category</label>
+              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="input mt-1">
+                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div><label className="label-x">Topic</label><input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} className="input mt-1" placeholder="e.g. Trees" /></div>
+          </div>
           {topicsForSubject(form.subject).length > 0 && (
             <div>
               <label className="label-x">Syllabus Topic</label>

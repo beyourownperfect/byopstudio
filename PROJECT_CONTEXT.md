@@ -1,6 +1,6 @@
 # BYOPGateCS.studio — Project Context
 
-Single-user GATE CS study operating system. Capture questions → solve under SRS → schedule revisions → measure momentum. **v1.2 production-ready.** Deployed as a single Render web service backed by MongoDB Atlas.
+Single-user GATE CS study operating system. Capture questions → solve under SRS → schedule revisions → measure momentum. **v1.3 production-ready.** Deployed as a single Render web service backed by MongoDB Atlas.
 
 ---
 
@@ -104,7 +104,8 @@ Question is "completed" when `interval_idx >= 3 AND correct_attempts >= 3`.
 | POST | `/api/questions/bulk-delete` | Multi-select delete |
 | POST | `/api/practice/submit` | Submit answer → updates SRS + auto-creates study_log |
 | GET | `/api/practice/next` | Fetch next question for given mode/subject |
-| GET | `/api/pulse` | Full dashboard data |
+| GET | `/api/pulse` | Full dashboard data (5s in-memory cache, invalidated on settings/schedule-revision/complete-revision/practice) |
+| GET | `/api/pulse/topic-readiness` | Lazy-loaded per-topic readiness (batched queries — no N+1 patterns). Keeps initial pulse response fast. |
 | GET/POST/PUT/DELETE | `/api/study-logs[/{id}]` | Manual log CRUD |
 | GET/POST/PUT/DELETE | `/api/timeline[/{id}]` | Timeline entries |
 | POST | `/api/timeline/{id}/complete-revision` | Complete a scheduled revision |
@@ -126,7 +127,7 @@ Question is "completed" when `interval_idx >= 3 AND correct_attempts >= 3`.
 ## 7. Frontend Pages
 
 ### Pulse (`/pulse`)
-Dashboard with **Today** section (MissionCard, Execution Queue, Momentum, Today's Progress), **Readiness** section (PreparationSnapshot, WeakTopics, SubjectCompletion), and **Lectures** section (LectureTable). StudyTimer in header. GATE countdown and settings modal (exam date + daily targets). Onboarding card for zero-data users. Card-2 headers with box-shadow depth and section dividers.
+Dashboard with **Today** section (MissionCard, Execution Queue, Momentum, Today's Progress), **Readiness** section (PreparationSnapshot, WeakTopics, SubjectCompletion). **Topic Readiness lazy-loaded** after initial render via `/api/pulse/topic-readiness` — dashboard paints immediately. MissionCard receives pre-fetched `user_missions` from pulse response (no redundant API call). Execution queue uses React Query with 60s stale time. StudyTimer in header. GATE countdown and settings modal (exam date + daily targets). Onboarding card for zero-data users.
 
 ### Repository (`/solve/repository`)
 Question bank with inline-editable grid table. 8 columns: checkbox, subject, type, statement (plain-text truncated for uniform row height), mastery bar, next revision, revisit, actions. Filter by subject/mode, search, sort, CSV import/export, bulk delete with undo, OCR prompt modal.
@@ -212,10 +213,12 @@ All pages use `space-y-6` (24px) between sections with headers inside `card-2` c
 - **Timeline bridging** — creating a timeline entry auto-creates a linked study_log; completing a revisit creates both a study_log and a timeline entry
 - **Reverse bridge** — orphan study logs (from timer, manual log, revisit complete) auto-create matching timeline entries so everything appears on the calendar
 - **Revision logs** — completing a timeline revision creates a "Revision" study_log
-- **Execution queue** — aggregated SRS + timeline revisions + revisits + missions into a single prioritized queue on Pulse
-- **Calendar is read-side aggregate** — no materialized view; sums study_logs on read
-- **Exam date auto-advance** — if persisted date is in the past, `_get_settings()` resets to default
-- **Seed covers all 12 subjects** — one question per GATE subject
+- **Pulse cache** — 5s in-memory TTL cache on `/api/pulse`. Invalidated by settings update, practice submit, schedule-revision, and complete-revision. Dramatically reduces response time on rapid navigations.
+- **Batched data fetching** — `_compute_topic_readiness()` and subject completion use batched queries (2-3 DB calls) + in-memory computation instead of 500+ per-topic sequential queries.
+- **Lazy topic readiness** — `/api/pulse/topic-readiness` is a separate endpoint. Pulse renders immediately while topic readiness loads asynchronously below the fold.
+- **MissionCard prop injection** — receives pre-fetched `user_missions` from pulse response, eliminating a redundant `/api/user-missions` API call on page load.
+- **QueueCard React Query** — uses `useQuery` with 60s stale time, avoiding re-fetch on every page navigation.
+- **SRS lookup sharing** — subject completion, question mastery, and topic readiness share a single `srs_lookup` dict within the pulse handler, eliminating 3 redundant full-collection SRS fetches.
 
 ---
 
@@ -241,4 +244,4 @@ All pages use `space-y-6` (24px) between sections with headers inside `card-2` c
 
 ---
 
-*Last updated: 2026-06-30 · v1.1*
+*Last updated: 2026-06-30 · v1.3*

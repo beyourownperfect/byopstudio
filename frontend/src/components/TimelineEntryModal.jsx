@@ -4,12 +4,13 @@ import RevisitMenu from "@/components/RevisitMenu";
 import SubjectSelect from "@/components/SubjectSelect";
 import { Trash2, Check, CalendarPlus, Clock } from "lucide-react";
 import { timelineApi } from "@/lib/api";
-import { ACTIVITIES, REVISIT_PRESETS, TID } from "@/lib/constants";
+import { ACTIVITIES, CATEGORIES, DEFAULT_CATEGORY, REVISIT_PRESETS, TID } from "@/lib/constants";
 import { todayISO, fmtDate, fmtDuration, isoAdd, relLabel } from "@/lib/dateUtils";
 
 const empty = {
   date: todayISO(), subject: "OS", activity: "Lecture", topic: "", title: "",
   duration_min: 60, questions_solved: 0, notes: "", completion_status: "completed",
+  category: DEFAULT_CATEGORY,
 };
 
 export default function TimelineEntryModal({ open, onClose, entry, onSaved }) {
@@ -87,9 +88,15 @@ export default function TimelineEntryModal({ open, onClose, entry, onSaved }) {
             </select>
           </div>
         </div>
-        <div>
-          <label className="label-x">Title</label>
-          <input value={form.title} onChange={(e) => set("title", e.target.value)} className="input mt-1" placeholder="e.g. Process Synchronization — Lecture 1 Complete" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div><label className="label-x">Category</label>
+            <select value={form.category} onChange={(e) => set("category", e.target.value)} className="input mt-1">
+              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div><label className="label-x">Title</label>
+            <input value={form.title} onChange={(e) => set("title", e.target.value)} className="input mt-1" placeholder="e.g. Process Synchronization — Lecture 1 Complete" />
+          </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div><label className="label-x">Topic</label><input value={form.topic} onChange={(e) => set("topic", e.target.value)} className="input mt-1" /></div>
