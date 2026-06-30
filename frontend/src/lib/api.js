@@ -112,6 +112,16 @@ export const subjectCompletionApi = {
 
 export const resourceUrl = (filename) => `${API}/resources/${filename}`;
 
+export const resourcesApi = {
+  upload: (file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return c.post("/resources/upload", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }).then((r) => r.data);
+  },
+};
+
 export const seed = () => c.post("/seed-demo").then((r) => r.data);
 
 export const queueApi = {

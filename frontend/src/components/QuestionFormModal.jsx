@@ -4,6 +4,7 @@ import Modal from "@/components/Modal";
 import { SUBJECTS, QUESTION_TYPES, DIFFICULTIES, EXAM_SOURCES, TID } from "@/lib/constants";
 import { questionsApi } from "@/lib/api";
 import usePasteMarkdown from "@/lib/usePasteMarkdown";
+import useImagePaste from "@/lib/useImagePaste";
 import { topicsForSubject } from "@/lib/gateSyllabus";
 
 const empty = {
@@ -123,7 +124,21 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
   const [form, setForm] = useState(empty);
   const [ocrText, setOcrText] = useState("");
   const { onPaste } = usePasteMarkdown();
+  const { onPaste: onImagePaste, onDrop: onImageDrop } = useImagePaste();
   const { toast, show } = useToast();
+
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type && /^image\//.test(items[i].type)) {
+          onImagePaste(e);
+          return;
+        }
+      }
+    }
+    onPaste(e);
+  };
 
   useEffect(() => {
     if (editing) {
@@ -294,7 +309,7 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
         </div>
         <div>
           <label className="label-x">Statement <span className="lowercase text-[hsl(var(--fg-subtle))]">(Markdown + LaTeX; paste HTML → Markdown)</span></label>
-          <textarea data-testid={TID.qFormStatement} value={form.statement} onChange={(e) => set("statement", e.target.value)} onPaste={onPaste} className="input mt-1 min-h-[100px]" required />
+          <textarea data-testid={TID.qFormStatement} value={form.statement} onChange={(e) => set("statement", e.target.value)} onPaste={handlePaste} onDrop={onImageDrop} className="input mt-1 min-h-[100px]" required />
         </div>
 
         {form.question_type !== "NAT" ? (
@@ -304,7 +319,7 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
               {form.options.map((opt, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <span className="mono text-xs text-[hsl(var(--fg-subtle))] w-6">{String.fromCharCode(65 + i)}.</span>
-                  <input value={opt} onChange={(e) => setOption(i, e.target.value)} onPaste={onPaste} className="input" placeholder={`Option ${String.fromCharCode(65 + i)}`} />
+                  <input value={opt} onChange={(e) => setOption(i, e.target.value)} onPaste={handlePaste} className="input" placeholder={`Option ${String.fromCharCode(65 + i)}`} />
                 </div>
               ))}
             </div>
@@ -322,7 +337,7 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
 
         <div>
           <label className="label-x">Explanation</label>
-          <textarea data-testid={TID.qFormExplanation} value={form.explanation} onChange={(e) => set("explanation", e.target.value)} onPaste={onPaste} className="input mt-1" />
+          <textarea data-testid={TID.qFormExplanation} value={form.explanation} onChange={(e) => set("explanation", e.target.value)} onPaste={handlePaste} onDrop={onImageDrop} className="input mt-1" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -331,7 +346,7 @@ export default function QuestionFormModal({ open, onClose, editing, onSaved }) {
           </div>
           <div>
             <label className="label-x">Notes</label>
-            <input data-testid={TID.qFormNotes} value={form.notes} onChange={(e) => set("notes", e.target.value)} onPaste={onPaste} className="input mt-1" placeholder="Personal notes" />
+            <input data-testid={TID.qFormNotes} value={form.notes} onChange={(e) => set("notes", e.target.value)} onPaste={handlePaste} className="input mt-1" placeholder="Personal notes" />
           </div>
         </div>
         <label className="inline-flex items-center gap-2 text-sm cursor-pointer">

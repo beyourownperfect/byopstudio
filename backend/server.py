@@ -3,7 +3,7 @@ BYOPGateCS.studio — GATE CSE Study Operating System
 Single-user backend. MongoDB. FastAPI.
 """
 
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from dotenv import load_dotenv
@@ -20,6 +20,8 @@ import uuid
 from datetime import datetime, timezone, date, timedelta
 
 ROOT_DIR = Path(__file__).parent
+UPLOAD_DIR = ROOT_DIR / "uploads"
+UPLOAD_DIR.mkdir(exist_ok=True)
 sys.path.insert(0, str(ROOT_DIR))
 load_dotenv(ROOT_DIR / ".env")
 
@@ -2226,6 +2228,29 @@ async def upsert_subject_completion(payload: Dict[str, Any]):
     item = SubjectCompletion(**update)
     await db.subject_completion.insert_one(item.model_dump())
     return {**item.model_dump(), "_calc": _compute_subject_completion(item.model_dump())}
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+
+
+# ============================ RESOURCES =============================
+@api_router.post("/resources/upload")
+async def upload_resource(file: UploadFile = File(...)):
+    if file.content_type and file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(400, f"Unsupported image type: {file.content_type}")
+    ext = os.path.splitext(file.filename or "image.png")[1] or ".png"
+    uid = str(uuid.uuid4())[:8]
+    filename = f"{uid}{ext}"
+    dest = UPLOAD_DIR / filename
+    with open(dest, "wb") as f:
+        f.write(await file.read())
+    return {"filename": filename, "url": f"/api/resources/{filename}"}
+
+
+@api_router.get("/resources/{filename}")
+async def get_resource(filename: str):
+    file_path = UPLOAD_DIR / filename
+    if not file_path.is_file() or ".." in filename or "/" in filename:
+        raise HTTPException(404, "File not found")
+    return FileResponse(file_path)
 
 
 # ============================ MOUNT =================================
