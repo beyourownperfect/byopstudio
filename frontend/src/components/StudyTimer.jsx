@@ -54,6 +54,31 @@ export default function StudyTimer() {
   const toggleRef = useRef(null);
   const resetRef = useRef(null);
 
+  const isGate = timerCategory === "GATE CSE";
+
+  const buildLogPayload = useCallback((minutes, remarks) => {
+    if (isGate) {
+      return {
+        date: todayISO(),
+        activity: timerActivity,
+        subject: timerSubject,
+        topic: timerTopic,
+        category: timerCategory,
+        duration_min: minutes,
+        remarks,
+      };
+    }
+    return {
+      date: todayISO(),
+      activity: "Reading",
+      subject: "",
+      topic: "",
+      category: timerCategory,
+      duration_min: minutes,
+      remarks,
+    };
+  }, [isGate, timerCategory, timerSubject, timerActivity, timerTopic]);
+
   const setRunning = (r) => {
     setRunningState(r);
     if (r) loggedRef.current = false;
@@ -103,21 +128,13 @@ export default function StudyTimer() {
       loggedRef.current = true;
       setRunning(false);
       const minutes = Math.round(totalSec / 60) || 1;
-      logsApi.create({
-        date: todayISO(),
-        activity: timerActivity,
-        subject: timerSubject,
-        topic: timerTopic,
-        category: timerCategory,
-        duration_min: minutes,
-        remarks: timerJournal || `Countdown timer: ${countdownMins}m session`,
-      }).then(() => {
+      logsApi.create(buildLogPayload(minutes, timerJournal || `Countdown timer: ${countdownMins}m session`)).then(() => {
         setSavedToast(true);
         setTimeout(() => setSavedToast(false), 3000);
       }).catch((err) => console.error("[StudyTimer] Failed to auto-log:", err));
       new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gICAf39/gICAf3+AgH9/f4CAf39/f4CAf39/gIB/f39/gIB/f3+AgH9/f4B/f3+AgICAf3+AgH9/f3+AgICAf3+AgICAf3+AgICAf39/gICAf39/f4B/f3+AgH9/f3+AgH9/f4B/f3+AgH9/f4B/f3+AgH9/f4CAf39/f4CAf39/gIB/f39/gICAf3+AgICAf3+AgICAf3+AgICAf3+AgICAf39/gID//w==").play().catch((err) => console.error("[StudyTimer] Audio playback failed:", err));
     }
-  }, [elapsed, running, mode, totalSec, countdownMins, timerSubject, timerActivity, timerJournal, timerTopic, timerCategory]);
+  }, [elapsed, running, mode, totalSec, countdownMins, timerCategory, timerJournal, buildLogPayload]);
 
   const switchMode = (m) => {
     setRunning(false);
@@ -131,19 +148,11 @@ export default function StudyTimer() {
     const minutes = Math.round(
       (mode === "stopwatch" ? elapsed : totalSec) / 60
     ) || 1;
-    await logsApi.create({
-      date: todayISO(),
-      activity: timerActivity,
-      subject: timerSubject,
-      topic: timerTopic,
-      category: timerCategory,
-      duration_min: minutes,
-      remarks:
-        timerJournal ||
-        (mode === "stopwatch"
-          ? `Stopwatch: ${formatTime(elapsed)}`
-          : `Countdown timer: ${countdownMins}m session`),
-    });
+    const remarks = timerJournal ||
+      (mode === "stopwatch"
+        ? `Stopwatch: ${formatTime(elapsed)}`
+        : `Countdown timer: ${countdownMins}m session`);
+    await logsApi.create(buildLogPayload(minutes, remarks));
     setTimerJournal("");
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 3000);
@@ -224,20 +233,24 @@ export default function StudyTimer() {
           </div>
         )}
 
-        {/* Subject picker */}
-        <SubjectSelect value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
-          className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-1.5 py-0.5 text-[10px] outline-none focus:border-[hsl(var(--accent))]"
-          title="Subject for auto-log"
-        />
+        {/* Subject picker (GATE only) */}
+        {isGate && (
+          <SubjectSelect value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
+            className="bg-[hsl(var(--bg-elev-2))] border border-border rounded px-1.5 py-0.5 text-[10px] outline-none focus:border-[hsl(var(--accent))]"
+            title="Subject for auto-log"
+          />
+        )}
 
-        {/* Topic input */}
-        <input
-          value={timerTopic}
-          onChange={(e) => setTimerTopic(e.target.value)}
-          placeholder="topic"
-          className="w-[72px] px-1.5 py-0.5 text-[10px] bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] placeholder:text-[hsl(var(--fg-subtle))]/50"
-          title="Topic (saved to log)"
-        />
+        {/* Topic input (GATE only) */}
+        {isGate && (
+          <input
+            value={timerTopic}
+            onChange={(e) => setTimerTopic(e.target.value)}
+            placeholder="topic"
+            className="w-[72px] px-1.5 py-0.5 text-[10px] bg-[hsl(var(--bg-elev-2))] border border-border rounded outline-none focus:border-[hsl(var(--accent))] placeholder:text-[hsl(var(--fg-subtle))]/50"
+            title="Topic (saved to log)"
+          />
+        )}
 
         {/* Category selector */}
         <select
@@ -390,21 +403,49 @@ export default function StudyTimer() {
 
             {/* Activity + subject + journal */}
             <div className="mt-6 max-w-xs mx-auto space-y-3">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="text-left">
-                  <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Subject</label>
-                  <SubjectSelect value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
-                    className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
-                  />
-                </div>
-                <div className="text-left">
-                  <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Activity</label>
-                  <select value={timerActivity} onChange={(e) => setTimerActivity(e.target.value)}
-                    className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
-                  >
-                    {ACTIVITIES.map((a) => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
+              {isGate ? (
+                <>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-left">
+                      <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Subject</label>
+                      <SubjectSelect value={timerSubject} onChange={(e) => setTimerSubject(e.target.value)}
+                        className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
+                      />
+                    </div>
+                    <div className="text-left">
+                      <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Activity</label>
+                      <select value={timerActivity} onChange={(e) => setTimerActivity(e.target.value)}
+                        className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
+                      >
+                        {ACTIVITIES.map((a) => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                    </div>
+                    <div className="text-left">
+                      <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Category</label>
+                      <select
+                        value={timerCategory}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setTimerCategory(v);
+                          try { localStorage.setItem("byop.studyCategory", v); } catch {}
+                        }}
+                        className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
+                      >
+                        {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Topic</label>
+                    <input
+                      value={timerTopic}
+                      onChange={(e) => setTimerTopic(e.target.value)}
+                      placeholder="e.g. Trees, Caches…"
+                      className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
+                    />
+                  </div>
+                </>
+              ) : (
                 <div className="text-left">
                   <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Category</label>
                   <select
@@ -419,16 +460,7 @@ export default function StudyTimer() {
                     {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-              </div>
-              <div className="text-left">
-                <label className="text-[10px] uppercase tracking-wide text-[hsl(var(--fg-subtle))]">Topic</label>
-                <input
-                  value={timerTopic}
-                  onChange={(e) => setTimerTopic(e.target.value)}
-                  placeholder="e.g. Trees, Caches…"
-                  className="bg-[hsl(var(--bg-elev-2))] border border-border rounded-md px-2 py-1.5 text-xs w-full mt-1 outline-none focus:border-[hsl(var(--accent))]"
-                />
-              </div>
+              )}
               <div className="text-left">
                 <textarea
                   value={timerJournal}

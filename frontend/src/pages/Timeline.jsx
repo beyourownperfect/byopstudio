@@ -43,7 +43,7 @@ export default function Timeline() {
   const [queue, setQueue] = useState(null);
   const [completedEntries, setCompletedEntries] = useState([]);
   const [expandedGroups, setExpandedGroups] = useState({ overdue: true, today: true, this_week: false, upcoming: false, completed: false });
-  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("GATE CSE");
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (view === "daily") return { rangeStart: selectedDate, rangeEnd: selectedDate };

@@ -868,16 +868,22 @@ async def create_log(payload: Dict[str, Any]):
     # Auto-bridge to timeline: every orphan log (no timeline_entry_id) creates
     # a matching timeline entry so study activity renders on the calendar.
     if not log.timeline_entry_id:
-        log_ot = log.official_topic or resolve_topic(log.subject, "", log.topic)
+        is_gate = log.category == "GATE CSE"
+        if is_gate:
+            log_ot = log.official_topic or resolve_topic(log.subject, "", log.topic)
+            title = log.remarks or syllabus_title(log.subject, log_ot, log.activity)
+        else:
+            log_ot = ""
+            title = log.remarks or log.category
         tl = TimelineEntry(
-            subject=log.subject,
-            topic=log.topic,
+            subject=log.subject if is_gate else "",
+            topic=log.topic if is_gate else "",
             official_topic=log_ot,
             category=log.category,
             activity=log.activity,
-            title=log.remarks or syllabus_title(log.subject, log_ot, log.activity),
+            title=title,
             duration_min=log.duration_min,
-            questions_solved=log.questions_attempted,
+            questions_solved=log.questions_attempted if is_gate else 0,
             notes=log.remarks,
             date=log.date,
             completion_status="completed",

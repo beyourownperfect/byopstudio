@@ -51,7 +51,7 @@ export default function Log() {
   const [viewerUrl, setViewerUrl] = useState("");
   const [viewerIsPdf, setViewerIsPdf] = useState(false);
   const [viewerContent, setViewerContent] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("GATE CSE");
 
   // Inline edit state for daily log rows
   const [editingLogId, setEditingLogId] = useState(null);
@@ -141,8 +141,18 @@ export default function Log() {
   }, []);
 
   const submit = async () => {
-    const payload = { ...form, duration_min: Number(form.duration_min) };
-    payload.official_topic = form.official_topic || matchTopic(form.subject, form.topic) || "";
+    const isGate = form.category === "GATE CSE";
+    const payload = {
+      ...form,
+      duration_min: Number(form.duration_min),
+      activity: isGate ? form.activity : "Reading",
+      subject: isGate ? form.subject : "",
+      topic: isGate ? form.topic : "",
+      official_topic: isGate ? (form.official_topic || matchTopic(form.subject, form.topic) || "") : "",
+      questions_attempted: isGate ? form.questions_attempted : 0,
+      questions_correct: isGate ? form.questions_correct : 0,
+      questions_wrong: isGate ? form.questions_wrong : 0,
+    };
     try { localStorage.setItem("byop.studyCategory", form.category); } catch {}
     await logsApi.create(payload);
     setOpen(false);
@@ -222,6 +232,12 @@ export default function Log() {
   const totalCorrect = logs.reduce((s, l) => s + (l.questions_correct || 0), 0);
   const activeSubjects = new Set(logs.map((l) => l.subject).filter(Boolean)).size;
 
+  const categoryBreakdown = logs.reduce((acc, l) => {
+    const cat = l.category || "GATE CSE";
+    acc[cat] = (acc[cat] || 0) + (l.duration_min || 0);
+    return acc;
+  }, {});
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -274,6 +290,22 @@ export default function Log() {
         <SumCard label="Questions" value={totalQs} />
         <SumCard label="Accuracy" value={totalQs ? `${Math.round(totalCorrect / totalQs * 100)}%` : "—"} />
       </div>
+
+      {Object.keys(categoryBreakdown).length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-[10px] text-[hsl(var(--fg-subtle))]">
+          <span className="uppercase tracking-wider">By category:</span>
+          {CATEGORIES.map((cat) => {
+            const mins = categoryBreakdown[cat] || 0;
+            if (!mins) return null;
+            return (
+              <span key={cat} className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[hsl(var(--bg-elev-2))]">
+                <span className="truncate max-w-[100px]">{cat}</span>
+                <span className="mono text-[hsl(var(--fg-muted))]">{fmtDuration(mins)}</span>
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {!categoryFilter || categoryFilter === "All" || categoryFilter === "GATE CSE" ? (
         <>
@@ -430,32 +462,43 @@ export default function Log() {
             <div><label className="label-x">Date</label><input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="input mt-1" /></div>
             <div><label className="label-x">Duration (min)</label><input data-testid={TID.logFormDuration} type="number" value={form.duration_min} onChange={(e) => setForm({ ...form, duration_min: e.target.value })} className="input mt-1" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="label-x">Activity</label><select data-testid={TID.logFormActivity} value={form.activity} onChange={(e) => setForm({ ...form, activity: e.target.value })} className="input mt-1">{ACTIVITIES.map((a) => <option key={a} value={a}>{a}</option>)}</select></div>
-            <div><label className="label-x">Subject</label><SubjectSelect data-testid={TID.logFormSubject} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="input mt-1" /></div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="label-x">Category</label>
+          {form.category === "GATE CSE" ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="label-x">Activity</label><select data-testid={TID.logFormActivity} value={form.activity} onChange={(e) => setForm({ ...form, activity: e.target.value })} className="input mt-1">{ACTIVITIES.map((a) => <option key={a} value={a}>{a}</option>)}</select></div>
+                <div><label className="label-x">Subject</label><SubjectSelect data-testid={TID.logFormSubject} value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="input mt-1" /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="label-x">Category</label>
+                  <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="input mt-1">
+                    {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div><label className="label-x">Topic</label><input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} className="input mt-1" placeholder="e.g. Trees" /></div>
+              </div>
+              {topicsForSubject(form.subject).length > 0 && (
+                <div>
+                  <label className="label-x">Syllabus Topic</label>
+                  <select value={form.official_topic} onChange={(e) => setForm({ ...form, official_topic: e.target.value })} className="input mt-1">
+                    <option value="">— None / Other —</option>
+                    {topicsForSubject(form.subject).map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                  </select>
+                </div>
+              )}
+              {form.activity === "Practice" && (
+                <div className="grid grid-cols-3 gap-3">
+                  <div><label className="label-x">Attempted</label><input type="number" value={form.questions_attempted} onChange={(e) => setForm({ ...form, questions_attempted: Number(e.target.value) })} className="input mt-1" /></div>
+                  <div><label className="label-x">Correct</label><input type="number" value={form.questions_correct} onChange={(e) => setForm({ ...form, questions_correct: Number(e.target.value) })} className="input mt-1" /></div>
+                  <div><label className="label-x">Wrong</label><input type="number" value={form.questions_wrong} onChange={(e) => setForm({ ...form, questions_wrong: Number(e.target.value) })} className="input mt-1" /></div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div>
+              <label className="label-x">Category</label>
               <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="input mt-1">
                 {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-            </div>
-            <div><label className="label-x">Topic</label><input value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} className="input mt-1" placeholder="e.g. Trees" /></div>
-          </div>
-          {topicsForSubject(form.subject).length > 0 && (
-            <div>
-              <label className="label-x">Syllabus Topic</label>
-              <select value={form.official_topic} onChange={(e) => setForm({ ...form, official_topic: e.target.value })} className="input mt-1">
-                <option value="">— None / Other —</option>
-                {topicsForSubject(form.subject).map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-              </select>
-            </div>
-          )}
-          {form.activity === "Practice" && (
-            <div className="grid grid-cols-3 gap-3">
-              <div><label className="label-x">Attempted</label><input type="number" value={form.questions_attempted} onChange={(e) => setForm({ ...form, questions_attempted: Number(e.target.value) })} className="input mt-1" /></div>
-              <div><label className="label-x">Correct</label><input type="number" value={form.questions_correct} onChange={(e) => setForm({ ...form, questions_correct: Number(e.target.value) })} className="input mt-1" /></div>
-              <div><label className="label-x">Wrong</label><input type="number" value={form.questions_wrong} onChange={(e) => setForm({ ...form, questions_wrong: Number(e.target.value) })} className="input mt-1" /></div>
             </div>
           )}
           <div><label className="label-x">Remarks / Journal</label><textarea value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} className="input mt-1 min-h-[60px]" placeholder="One or two lines — what was hard, what clicked, what to revisit." /></div>
