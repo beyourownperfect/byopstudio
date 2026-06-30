@@ -97,19 +97,19 @@ export const HELP_CONTENT = {
     sections: [
       {
         title: "Purpose",
-        body: "Visual calendar of everything you studied + everything you've scheduled to revise. Daily, Weekly, and Monthly views.",
+        body: "Your execution hub. Queue view shows what to do next (SRS revisions, scheduled revisions, revisits, missions). Calendar views (Daily/Weekly/Monthly) show everything you've logged and scheduled.",
+      },
+      {
+        title: "Queue (default view)",
+        body: "Prioritized sections: Overdue, Today, This Week, Upcoming, Completed. Each item shows subject, task type, and due date. Hover for a Start button that deep-links directly to the owning module (Practice, Log, etc.).",
       },
       {
         title: "Scheduling revisions",
-        body: "Open any timeline entry → use the quick presets (+1d, +3d, +7d, +14d, +30d) or pick a custom date. Scheduled revisions appear on their target date in Timeline, in 'Due Revisions' on Pulse, and in Today's Mission.",
+        body: "Open any timeline entry → use the quick presets (+1d, +3d, +7d, +14d, +30d) or pick a custom date. Scheduled revisions appear on their target date in Timeline and in the Queue.",
       },
       {
         title: "Best workflow",
-        body: "After a lecture or chapter, log a Timeline entry with title + duration, then immediately schedule a +1d and +7d revision. Complete revisions from the entry modal to keep the streak honest.",
-      },
-      {
-        title: "Why it matters",
-        body: "Revisions are where mastery happens. The Timeline turns scheduling into a habit, the SRS does the math, and Pulse tells you exactly what's due — together they replace a study planner entirely.",
+        body: "Start each session from the Queue — it tells you exactly what's due. After a lecture or chapter, log a Timeline entry, then immediately schedule +1d and +7d revisions. Complete revisions from the entry modal to keep the streak honest.",
       },
     ],
   },

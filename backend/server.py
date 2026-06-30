@@ -110,6 +110,7 @@ class Lecture(BaseModel):
     lecture_name: str = ""
     lecture_number: str = ""
     duration_min: int = 0
+    total_duration_min: int = 0
     completion_percent: int = 0
     notes_done: bool = False
     revision_done: bool = False
@@ -1969,6 +1970,9 @@ async def seed_demo():
 async def create_lecture(payload: Dict[str, Any]):
     if payload.get("subject") not in SUBJECTS:
         raise HTTPException(400, f"Invalid subject. Use one of {SUBJECTS}")
+    if "total_duration_min" in payload and payload["total_duration_min"] > 0:
+        dur = payload.get("duration_min", 0)
+        payload["completion_percent"] = min(100, round(dur / payload["total_duration_min"] * 100))
     lec = Lecture(**{k: v for k, v in payload.items() if k in Lecture.model_fields})
     await db.lectures.insert_one(lec.model_dump())
     return lec
@@ -1989,6 +1993,13 @@ async def update_lecture(lid: str, payload: Dict[str, Any]):
     if not update:
         raise HTTPException(400, "No fields to update")
     update["updated_at"] = now_iso()
+    if "duration_min" in update or "total_duration_min" in update:
+        existing = await db.lectures.find_one({"id": lid}, {"_id": 0, "duration_min": 1, "total_duration_min": 1})
+        if existing:
+            dur = update.get("duration_min", existing.get("duration_min", 0))
+            total = update.get("total_duration_min", existing.get("total_duration_min", 0))
+            if total > 0:
+                update["completion_percent"] = min(100, round(dur / total * 100))
     res = await db.lectures.find_one_and_update({"id": lid}, {"$set": update}, return_document=True)
     if not res:
         raise HTTPException(404, "Lecture not found")

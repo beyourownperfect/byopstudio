@@ -265,67 +265,6 @@ function MomentumCard({ momentum, delta, sparkline }) {
   );
 }
 
-function DueTodayCard({ dueSrs, dueTimelineRevisions, dueTimelineRevisionsList, dueRevisits, navigate }) {
-  const tlDue = dueTimelineRevisionsList || [];
-  return (
-    <div className="card-2 p-5 bg-[hsl(var(--accent))]/[0.04] border-[hsl(var(--accent))]/20" data-testid={TID.pulseDueRev}>
-      <div className="label-x mb-2">Due Today</div>
-      <div className="space-y-3">
-        <button
-          onClick={() => navigate("/solve/practice?mode=due")}
-          className="group text-left p-2 -m-2 rounded hover:bg-[hsl(var(--accent))]/[0.08] transition-colors block w-full"
-        >
-          <div className="flex items-center gap-1">
-            <span className="text-3xl font-semibold mono">{dueSrs}</span>
-            <ArrowRight className="w-3.5 h-3.5 text-[hsl(var(--accent))] opacity-0 group-hover:opacity-100 transition-opacity translate-x-0 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-          <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-0.5">SRS revisions</div>
-        </button>
-        {tlDue.length > 0 && (
-          <div>
-            <button
-              onClick={() => navigate("/timeline?view=daily")}
-              className="group text-left p-2 -m-2 rounded hover:bg-[hsl(var(--accent))]/[0.08] transition-colors block w-full"
-            >
-              <div className="flex items-center gap-1">
-                <span className="text-3xl font-semibold mono">{dueTimelineRevisions}</span>
-                <ArrowRight className="w-3.5 h-3.5 text-[hsl(var(--accent))] opacity-0 group-hover:opacity-100 transition-opacity translate-x-0 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-              <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-0.5">Timeline revisions</div>
-            </button>
-            <div className="mt-2 space-y-1">
-              {tlDue.slice(0, 3).map((tr) => (
-                <button
-                  key={tr.entry_id + "-" + tr.date}
-                  onClick={() => navigate("/timeline?view=daily")}
-                  className="w-full text-left px-2 py-1 rounded border border-border text-xs hover:bg-[hsl(var(--accent))]/[0.06] transition-colors truncate"
-                  title={`${tr.subject}: ${tr.title} (${tr.date})`}
-                >
-                  <span className="chip chip-accent text-[10px] mr-1.5">{tr.subject}</span>
-                  {tr.title}
-                </button>
-              ))}
-              {tlDue.length > 3 && (
-                <p className="text-[10px] text-[hsl(var(--fg-subtle))] px-2">+{tlDue.length - 3} more</p>
-              )}
-            </div>
-          </div>
-        )}
-        <button
-          onClick={() => navigate("/solve/repository?filter=revisit_today")}
-          className="group text-left p-2 -m-2 rounded hover:bg-[hsl(var(--accent))]/[0.08] transition-colors block w-full"
-        >
-          <div className="flex items-center gap-1">
-            <span className="text-3xl font-semibold mono">{dueRevisits}</span>
-            <ArrowRight className="w-3.5 h-3.5 text-[hsl(var(--accent))] opacity-0 group-hover:opacity-100 transition-opacity translate-x-0 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-          <div className="text-[11px] text-[hsl(var(--fg-muted))] mt-0.5">Revisit items</div>
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function WeakTopicsCard({ weakTopics, expanded, toggle, navigate }) {
   const top = weakTopics?.[0];
   return (

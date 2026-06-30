@@ -1,21 +1,37 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Plus, ChevronLeft, ChevronRight, Calendar as CalIcon } from "lucide-react";
-import { timelineApi, calendarApi, revisitsApi } from "@/lib/api";
-import { TID } from "@/lib/constants";
-import { todayISO, fmtDate, fmtDateLong, fmtDuration, isoAdd, startOfWeek } from "@/lib/dateUtils";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { Plus, ChevronLeft, ChevronRight, Calendar as CalIcon, ArrowRight, Clock, CheckCircle2, BookOpen, RotateCcw, Target, ListOrdered } from "lucide-react";
+import { timelineApi, calendarApi, revisitsApi, queueApi } from "@/lib/api";
+import { SUBJECT_LABELS, TID } from "@/lib/constants";
+import { todayISO, fmtDateLong, fmtDuration, isoAdd, startOfWeek, relLabel } from "@/lib/dateUtils";
 import TimelineEntryModal from "@/components/TimelineEntryModal";
 import HelpButton from "@/components/HelpButton";
 import { HELP_CONTENT } from "@/lib/helpContent";
 
-const VIEWS = ["daily", "weekly", "monthly"];
+const VIEWS = ["queue", "daily", "weekly", "monthly"];
+
+const GROUP_CONFIG = {
+  overdue: { label: "Overdue", color: "text-[hsl(var(--danger))]", bg: "bg-[hsl(var(--danger))]/10", border: "border-[hsl(var(--danger))]/30", dot: "bg-[hsl(var(--danger))]" },
+  today: { label: "Today", color: "text-[hsl(var(--accent))]", bg: "bg-[hsl(var(--accent))]/10", border: "border-[hsl(var(--accent))]/30", dot: "bg-[hsl(var(--accent))]" },
+  this_week: { label: "This Week", color: "text-[hsl(var(--info))]", bg: "bg-[hsl(var(--info))]/10", border: "border-[hsl(var(--info))]/30", dot: "bg-[hsl(var(--info))]" },
+  upcoming: { label: "Upcoming", color: "text-[hsl(var(--fg-muted))]", bg: "bg-[hsl(var(--bg-elev-2))]", border: "border-border", dot: "bg-[hsl(var(--fg-muted))]" },
+  completed: { label: "Completed", color: "text-[hsl(var(--success))]", bg: "bg-[hsl(var(--success))]/10", border: "border-[hsl(var(--success))]/30", dot: "bg-[hsl(var(--success))]" },
+};
+
+const KIND_ICONS = {
+  srs: RotateCcw,
+  timeline_revision: BookOpen,
+  revisit: Clock,
+  mission: Target,
+};
 
 export default function Timeline() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const urlView = searchParams.get("view");
-  const initialView = urlView && VIEWS.includes(urlView) ? urlView : "monthly";
+  const initialView = urlView && VIEWS.includes(urlView) ? urlView : "queue";
   const [view, setView] = useState(initialView);
-  const [cursor, setCursor] = useState(new Date()); // current focus date
+  const [cursor, setCursor] = useState(new Date());
   const [entries, setEntries] = useState([]);
   const [scheduledRev, setScheduledRev] = useState([]);
   const [calendarDays, setCalendarDays] = useState([]);
@@ -23,6 +39,9 @@ export default function Timeline() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [selectedDate, setSelectedDate] = useState(todayISO());
+  const [queue, setQueue] = useState(null);
+  const [completedEntries, setCompletedEntries] = useState([]);
+  const [expandedGroups, setExpandedGroups] = useState({ overdue: true, today: true, this_week: false, upcoming: false, completed: false });
 
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (view === "daily") return { rangeStart: selectedDate, rangeEnd: selectedDate };
@@ -37,18 +56,27 @@ export default function Timeline() {
   }, [view, cursor, selectedDate]);
 
   const load = async () => {
-    const [t, c, r] = await Promise.all([
-      timelineApi.list({ start: rangeStart, end: rangeEnd }),
-      calendarApi.range(rangeStart, rangeEnd),
-      revisitsApi.list({ start: rangeStart, end: rangeEnd }),
-    ]);
-    setEntries(t.items || []);
-    setScheduledRev(t.scheduled_revisions || []);
-    setCalendarDays(c.days || []);
-    setRevisits(r.items || []);
+    if (view === "queue") {
+      const [q, t] = await Promise.all([
+        queueApi.get(),
+        timelineApi.list({ start: isoAdd(todayISO(), -30), end: todayISO() }),
+      ]);
+      setQueue(q);
+      setCompletedEntries((t.items || []).filter((e) => e.completion_status === "completed"));
+    } else {
+      const [t, c, r] = await Promise.all([
+        timelineApi.list({ start: rangeStart, end: rangeEnd }),
+        calendarApi.range(rangeStart, rangeEnd),
+        revisitsApi.list({ start: rangeStart, end: rangeEnd }),
+      ]);
+      setEntries(t.items || []);
+      setScheduledRev(t.scheduled_revisions || []);
+      setCalendarDays(c.days || []);
+      setRevisits(r.items || []);
+    }
   };
 
-  useEffect(() => { load(); }, [rangeStart, rangeEnd]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [rangeStart, rangeEnd, view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refresh = async () => {
     load();
@@ -58,7 +86,7 @@ export default function Timeline() {
     }
   };
 
-  const startNew = () => { setEditing({ ...{ date: selectedDate || todayISO() } }); setOpen(true); };
+  const startNew = () => { setEditing({ date: selectedDate || todayISO() }); setOpen(true); };
   const openEntry = (e) => { setEditing(e); setOpen(true); };
 
   const nav = (dir) => {
@@ -70,7 +98,6 @@ export default function Timeline() {
     if (view === "daily") setSelectedDate(d.toISOString().slice(0, 10));
   };
 
-  // Group entries + scheduled revs + revisits by date
   const dayMap = useMemo(() => {
     const m = {};
     for (const e of entries) {
@@ -88,29 +115,43 @@ export default function Timeline() {
 
   const calMap = useMemo(() => Object.fromEntries(calendarDays.map((c) => [c.date, c])), [calendarDays]);
 
+  const toggleGroup = (key) => setExpandedGroups((e) => ({ ...e, [key]: !e[key] }));
+  const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
   return (
     <div className="space-y-6">
       <div className="card-2 px-5 py-4 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <div>
-            <h1 className="text-xl font-semibold flex items-center gap-2"><CalIcon className="w-5 h-5 text-[hsl(var(--accent))]" /> Timeline</h1>
-            <p className="text-xs text-[hsl(var(--fg-muted))]">Your study calendar & preparation history.</p>
+            <h1 className="text-xl font-semibold flex items-center gap-2">
+              {view === "queue" ? <ListOrdered className="w-5 h-5 text-[hsl(var(--accent))]" /> : <CalIcon className="w-5 h-5 text-[hsl(var(--accent))]" />}
+              Timeline
+            </h1>
+            <p className="text-xs text-[hsl(var(--fg-muted))]">
+              {view === "queue" ? "Prioritized execution queue — what to work on next." : "Your study calendar & preparation history."}
+            </p>
           </div>
           <HelpButton moduleKey="timeline" title={HELP_CONTENT.timeline.title} sections={HELP_CONTENT.timeline.sections} />
         </div>
         <div className="flex items-center gap-2">
           <div className="card-1 p-0.5 flex items-center text-xs">
+            <button data-testid="tl-view-queue" onClick={() => setView("queue")} className={`px-3 py-1 rounded ${view === "queue" ? "bg-[hsl(var(--bg-elev-2))]" : "text-[hsl(var(--fg-muted))]"}`}>Queue</button>
             <button data-testid={TID.tlViewDaily} onClick={() => setView("daily")} className={`px-3 py-1 rounded ${view === "daily" ? "bg-[hsl(var(--bg-elev-2))]" : "text-[hsl(var(--fg-muted))]"}`}>Daily</button>
             <button data-testid={TID.tlViewWeekly} onClick={() => setView("weekly")} className={`px-3 py-1 rounded ${view === "weekly" ? "bg-[hsl(var(--bg-elev-2))]" : "text-[hsl(var(--fg-muted))]"}`}>Weekly</button>
             <button data-testid={TID.tlViewMonthly} onClick={() => setView("monthly")} className={`px-3 py-1 rounded ${view === "monthly" ? "bg-[hsl(var(--bg-elev-2))]" : "text-[hsl(var(--fg-muted))]"}`}>Monthly</button>
           </div>
-          <button data-testid={TID.tlPrev} onClick={() => nav(-1)} className="btn-ghost p-1.5"><ChevronLeft className="w-4 h-4" /></button>
-          <button data-testid={TID.tlNext} onClick={() => nav(1)} className="btn-ghost p-1.5"><ChevronRight className="w-4 h-4" /></button>
+          {view !== "queue" && (
+            <>
+              <button data-testid={TID.tlPrev} onClick={() => nav(-1)} className="btn-ghost p-1.5"><ChevronLeft className="w-4 h-4" /></button>
+              <button data-testid={TID.tlNext} onClick={() => nav(1)} className="btn-ghost p-1.5"><ChevronRight className="w-4 h-4" /></button>
+            </>
+          )}
           <button data-testid={TID.tlNewBtn} onClick={startNew} className="btn btn-primary"><Plus className="w-3.5 h-3.5" /> New entry</button>
         </div>
       </div>
 
-      {view === "monthly" && <MonthlyView cursor={cursor} dayMap={dayMap} calMap={calMap} selectedDate={selectedDate} setSelectedDate={setSelectedDate} openEntry={openEntry} />}
+      {view === "queue" && <QueueView queue={queue} completedEntries={completedEntries} expandedGroups={expandedGroups} toggleGroup={toggleGroup} navigate={navigate} openEntry={openEntry} />}
+      {view === "monthly" && <MonthlyView cursor={cursor} dayMap={dayMap} calMap={calMap} selectedDate={selectedDate} setSelectedDate={setSelectedDate} openEntry={openEntry} monthLabel={monthLabel} />}
       {view === "weekly" && <WeeklyView rangeStart={rangeStart} dayMap={dayMap} calMap={calMap} openEntry={openEntry} />}
       {view === "daily" && <DailyView date={selectedDate} dayMap={dayMap} calMap={calMap} openEntry={openEntry} />}
 
@@ -119,10 +160,111 @@ export default function Timeline() {
   );
 }
 
+// ============ QUEUE VIEW ============
+function QueueView({ queue, completedEntries, expandedGroups, toggleGroup, navigate, openEntry }) {
+  if (!queue) {
+    return (
+      <div className="card-2 p-8 text-center">
+        <div className="skeleton h-6 w-48 mx-auto mb-4" />
+        <div className="skeleton h-4 w-64 mx-auto" />
+      </div>
+    );
+  }
+
+  const allEmpty = queue.total === 0 && completedEntries.length === 0;
+  if (allEmpty) {
+    return (
+      <div className="card-2 p-10 text-center">
+        <CheckCircle2 className="w-10 h-10 text-[hsl(var(--success))] mx-auto mb-3" />
+        <h3 className="text-lg font-semibold mb-1">All caught up!</h3>
+        <p className="text-sm text-[hsl(var(--fg-muted))] max-w-md mx-auto">No pending tasks. Add questions, schedule revisions, or log a study session to build your execution queue.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {Object.entries(GROUP_CONFIG).map(([key, g]) => {
+        let items;
+        if (key === "completed") {
+          items = completedEntries.map((e) => ({
+            id: e.id,
+            kind: "timeline_entry",
+            subject: e.subject,
+            title: e.title,
+            due_date: e.date,
+            link: "",
+            meta: `${e.activity} · ${e.duration_min > 0 ? fmtDuration(e.duration_min) : ""}`,
+            entry: e,
+          }));
+        } else {
+          items = queue.groups[key] || [];
+        }
+        if (items.length === 0) return null;
+
+        const isExp = expandedGroups[key];
+        return (
+          <div key={key} className="card-2 overflow-hidden">
+            <button
+              onClick={() => toggleGroup(key)}
+              className={`w-full flex items-center justify-between px-5 py-3 text-left text-sm font-semibold tracking-wide uppercase transition-colors hover:bg-[hsl(var(--bg-elev))]/60 border-b ${isExp ? "border-border" : "border-transparent"}`}
+            >
+              <span className={`${g.color} flex items-center gap-2`}>
+                <span className={`w-2 h-2 rounded-full ${g.dot}`} />
+                {g.label}
+              </span>
+              <span className="mono text-xs text-[hsl(var(--fg-muted))]">{items.length}</span>
+            </button>
+            {isExp && (
+              <div className="divide-y divide-border/50">
+                {items.map((item) => (
+                  <QueueItem key={item.id} item={item} navigate={navigate} openEntry={openEntry} />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function QueueItem({ item, navigate, openEntry }) {
+  const Icon = KIND_ICONS[item.kind] || BookOpen;
+  const subjLabel = item.subject ? (SUBJECT_LABELS[item.subject] || item.subject) : "";
+
+  const handleStart = () => {
+    if (item.link) {
+      navigate(item.link);
+    } else if (item.entry) {
+      openEntry(item.entry);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 px-5 py-3 hover:bg-[hsl(var(--bg-elev))]/30 transition-colors group">
+      <Icon className="w-4 h-4 text-[hsl(var(--fg-subtle))] shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate">{item.title}</div>
+        <div className="text-[10px] text-[hsl(var(--fg-subtle))] flex items-center gap-1.5 mt-0.5">
+          {subjLabel && <span className="chip chip-accent text-[9px]">{subjLabel}</span>}
+          <span>{item.meta}</span>
+          {item.due_date && <span>· {relLabel(item.due_date)}</span>}
+        </div>
+      </div>
+      <button
+        onClick={handleStart}
+        className="btn-primary text-[11px] px-3 py-1.5 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        Start <ArrowRight className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
 // ============ MONTHLY ============
-function MonthlyView({ cursor, dayMap, calMap, selectedDate, setSelectedDate, openEntry }) {
+function MonthlyView({ cursor, dayMap, calMap, selectedDate, setSelectedDate, openEntry, monthLabel }) {
   const y = cursor.getFullYear(), m = cursor.getMonth();
-  const monthLabel = cursor.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const first = new Date(y, m, 1);
   const startDay = first.getDay();
   const totalDays = new Date(y, m + 1, 0).getDate();
@@ -182,7 +324,6 @@ function MonthlyView({ cursor, dayMap, calMap, selectedDate, setSelectedDate, op
           <Legend color="info" label="Revisit item" />
         </div>
       </div>
-
       <DayDetail date={selectedDate} data={selected} cal={selectedCal} openEntry={openEntry} />
     </div>
   );
@@ -242,9 +383,9 @@ function DailyView({ date, dayMap, calMap, openEntry }) {
   return <DayDetail date={date} data={data} cal={cal} openEntry={openEntry} fullWidth />;
 }
 
-function DayDetail({ date, data, cal, openEntry, fullWidth }) {
+function DayDetail({ date, data, cal, openEntry }) {
   return (
-    <div className={`card-2 p-4 ${fullWidth ? "" : ""}`}>
+    <div className="card-2 p-4">
       <div className="border-b-2 border-border pb-3 mb-3">
         <div className="label-x">Selected day</div>
         <h2 className="text-lg font-semibold">{fmtDateLong(date)}</h2>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, Plus, Star, Trash2, Edit3, Play, Upload, Download, ExternalLink, X, ArrowUp, ArrowDown, ArrowUpDown, FileText } from "lucide-react";
+import { Search, Plus, Star, Trash2, Edit3, Play, Upload, Download, ExternalLink, X, ArrowUp, ArrowDown, ArrowUpDown, FileText, HelpCircle } from "lucide-react";
 import Papa from "papaparse";
 import { questionsApi, seed } from "@/lib/api";
 import { SUBJECTS, SUBJECT_LABELS, TID } from "@/lib/constants";
@@ -75,6 +75,7 @@ export default function Repository() {
   const [undoBuffer, setUndoBuffer] = useState(null); // { items, expiresAt }
   const [sortBy, setSortBy] = useState(saved.sortBy || { key: "updated_at", dir: "desc" });
   const [ocrOpen, setOcrOpen] = useState(false);
+  const [importGuideOpen, setImportGuideOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -248,6 +249,9 @@ export default function Repository() {
             <Upload className="w-3.5 h-3.5" /> Import CSV
             <input type="file" accept=".csv" onChange={onImport} className="hidden" />
           </label>
+          <button onClick={() => setImportGuideOpen(true)} className="btn btn-ghost p-1.5" title="CSV import guide">
+            <HelpCircle className="w-3.5 h-3.5" />
+          </button>
           <button onClick={onExport} className="btn" data-testid={TID.repoExportCsv}>
             <Download className="w-3.5 h-3.5" /> Export CSV
           </button>
@@ -330,6 +334,7 @@ export default function Repository() {
       )}
 
       <OcrPromptModal open={ocrOpen} onClose={() => setOcrOpen(false)} />
+      <ImportGuide open={importGuideOpen} onClose={() => setImportGuideOpen(false)} />
       <QuestionFormModal open={formOpen} onClose={() => setFormOpen(false)} editing={editing} onSaved={load} />
       <QuestionDetailsModal
         open={detailsOpen}
@@ -429,6 +434,73 @@ function EmptyRepo({ onSeed, onNew }) {
       <div className="flex items-center justify-center gap-2">
         <button onClick={onNew} className="btn btn-primary"><Plus className="w-3.5 h-3.5" /> New question</button>
         <button onClick={onSeed} className="btn">Load 12 sample questions</button>
+      </div>
+    </div>
+  );
+}
+
+function ImportGuide({ open, onClose }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative card-2 p-6 w-full max-w-lg max-h-[85vh] overflow-auto">
+        <button onClick={onClose} className="absolute top-3 right-3 btn-ghost p-1 text-[hsl(var(--fg-muted))] hover:text-[hsl(var(--fg))]">
+          <X className="w-4 h-4" />
+        </button>
+
+        <h3 className="text-lg font-semibold mb-1">CSV Import Guide</h3>
+        <p className="text-xs text-[hsl(var(--fg-muted))] mb-4">Expected format and columns for bulk question import.</p>
+
+        <div className="space-y-4 text-sm">
+          <div>
+            <h4 className="font-semibold text-[11px] uppercase tracking-wide text-[hsl(var(--fg-subtle))] mb-1.5">Required Columns</h4>
+            <div className="bg-[hsl(var(--bg-elev-2))] rounded-md p-3 text-[11px] space-y-1">
+              <div><code className="chip mono text-[10px]">subject</code> <span className="text-[hsl(var(--fg-muted))]">One of: C, DS, AL, OS, DB, COA, TOC, CD, DL, EM, DM, CN</span></div>
+              <div><code className="chip mono text-[10px]">question_type</code> <span className="text-[hsl(var(--fg-muted))]">MCQ, MSQ, or NAT</span></div>
+              <div><code className="chip mono text-[10px]">statement</code> <span className="text-[hsl(var(--fg-muted))]">Question text. Supports Markdown and LaTeX ($...$)</span></div>
+              <div><code className="chip mono text-[10px]">options</code> <span className="text-[hsl(var(--fg-muted))]">Pipe-separated: A&#124;B&#124;C&#124;D (skip for NAT)</span></div>
+              <div><code className="chip mono text-[10px]">correct_answer</code> <span className="text-[hsl(var(--fg-muted))]">Index (0=A,1=B) or "A,B" for MSQ, or string for NAT</span></div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-[11px] uppercase tracking-wide text-[hsl(var(--fg-subtle))] mb-1.5">Optional Columns</h4>
+            <div className="bg-[hsl(var(--bg-elev-2))] rounded-md p-3 text-[11px] space-y-1">
+              <div><code className="chip mono text-[10px]">topic</code><span className="text-[hsl(var(--fg-muted))]"> Sub-topic name</span></div>
+              <div><code className="chip mono text-[10px]">explanation</code><span className="text-[hsl(var(--fg-muted))]"> Solution text (Markdown + LaTeX)</span></div>
+              <div><code className="chip mono text-[10px]">year</code><span className="text-[hsl(var(--fg-muted))]"> Exam year (integer)</span></div>
+              <div><code className="chip mono text-[10px]">exam_source</code><span className="text-[hsl(var(--fg-muted))]"> GATE, ISRO, GO DPP, GO Mock...</span></div>
+              <div><code className="chip mono text-[10px]">difficulty</code><span className="text-[hsl(var(--fg-muted))]"> Easy, Medium, Hard</span></div>
+              <div><code className="chip mono text-[10px]">gateoverflow_url</code><span className="text-[hsl(var(--fg-muted))]"> Link to discussion</span></div>
+              <div><code className="chip mono text-[10px]">bookmarked</code><span className="text-[hsl(var(--fg-muted))]"> true or false</span></div>
+              <div><code className="chip mono text-[10px]">notes</code><span className="text-[hsl(var(--fg-muted))]"> Personal notes</span></div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-[11px] uppercase tracking-wide text-[hsl(var(--fg-subtle))] mb-1.5">Example CSV</h4>
+            <pre className="bg-[hsl(var(--bg-elev-2))] rounded-md p-3 text-[10px] mono text-[hsl(var(--fg-muted))] overflow-x-auto">
+{`subject,question_type,statement,options,correct_answer,difficulty,topic,year
+OS,MCQ,What is a page fault?,A CPU interrupt|A memory access error|A disk error|A network error,1,Medium,Memory Management,2021
+DS,NAT,Height of a balanced BST with 7 nodes?,,4,Easy,Trees,2019`}
+            </pre>
+          </div>
+
+          <div>
+            <h4 className="font-semibold text-[11px] uppercase tracking-wide text-[hsl(var(--fg-subtle))] mb-1.5">Recommended Workflow: OCR → Import</h4>
+            <ol className="list-decimal list-inside space-y-1 text-[11px] text-[hsl(var(--fg-muted))]">
+              <li>Snap/photocopy the question page from a PDF or book.</li>
+              <li>Use the <strong>OCR</strong> button to copy the AI prompt template.</li>
+              <li>Paste the prompt into ChatGPT/Claude/Gemini with your image.</li>
+              <li>AI returns a CSV-formatted table — copy and save as <code className="mono text-[10px]">.csv</code>.</li>
+              <li>Click <strong>Import CSV</strong> to bulk-load into the repository.</li>
+              <li>Review imported questions and add explanations/links.</li>
+            </ol>
+          </div>
+        </div>
+
+        <button onClick={onClose} className="btn btn-primary w-full mt-6 text-sm">Got it</button>
       </div>
     </div>
   );

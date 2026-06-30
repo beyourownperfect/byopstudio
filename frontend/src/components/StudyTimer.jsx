@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, RotateCcw, Maximize2, X, Save } from "lucide-react";
+import { Play, Pause, RotateCcw, Maximize2, X, Save, CheckCircle } from "lucide-react";
 import { logsApi } from "@/lib/api";
 import { ACTIVITIES } from "@/lib/constants";
 import { todayISO } from "@/lib/dateUtils";
@@ -121,7 +121,7 @@ export default function StudyTimer() {
 
   const closeFocus = useCallback(() => setFocusOpen(false), []);
 
-  const saveToLog = async () => {
+  const completeSession = async () => {
     const minutes = Math.round(
       (mode === "stopwatch" ? elapsed : totalSec) / 60
     ) || 1;
@@ -251,7 +251,7 @@ export default function StudyTimer() {
         </button>
 
         <span className="w-px h-5 bg-border mx-0.5" />
-        <button onClick={saveToLog} className="btn-ghost p-1" title="Save to log" disabled={display <= 0}>
+        <button onClick={completeSession} className="btn-ghost p-1 text-[hsl(var(--success))]" title="Complete Session" disabled={display <= 0}>
           <Save className="w-3.5 h-3.5" />
         </button>
         <button onClick={() => setFocusOpen(true)} className="btn-ghost p-1" title="Focus mode">
@@ -261,7 +261,7 @@ export default function StudyTimer() {
         {/* Saved toast */}
         {savedToast && !focusOpen && (
           <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-[hsl(var(--success))] whitespace-nowrap animate-modal-in">
-            ✓ Saved to log
+            ✓ Session completed
           </span>
         )}
       </div>
@@ -404,12 +404,12 @@ export default function StudyTimer() {
                 />
               </div>
             </div>
-            <button onClick={saveToLog} className="btn btn-primary mt-3 text-xs" disabled={display <= 0}>
-              <Save className="w-3 h-3" /> Save to log
+            <button onClick={completeSession} className="btn btn-primary mt-3 text-xs flex items-center gap-1.5" disabled={display <= 0}>
+              <CheckCircle className="w-3 h-3" /> Complete Session
             </button>
 
             {savedToast && (
-              <p className="text-[10px] text-[hsl(var(--success))] mt-2 animate-modal-in">✓ Saved to log</p>
+              <p className="text-[11px] text-[hsl(var(--success))] mt-2 animate-modal-in">✓ Session completed — saved to log & timeline</p>
             )}
 
             <p className="text-[11px] text-[hsl(var(--fg-subtle))] mt-4">Esc to close · Space = start/pause · R = reset</p>
