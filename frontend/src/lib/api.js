@@ -67,8 +67,11 @@ export const revisitsApi = {
 };
 
 export const calendarApi = {
-  range: (start, end) =>
-    c.get("/calendar", { params: { start, end } }).then((r) => r.data),
+  range: (start, end, category) => {
+    const params = { start, end };
+    if (category) params.category = category;
+    return c.get("/calendar", { params }).then((r) => r.data);
+  },
 };
 
 export const pulseApi = {
@@ -125,5 +128,5 @@ export const resourcesApi = {
 export const seed = () => c.post("/seed-demo").then((r) => r.data);
 
 export const queueApi = {
-  get: () => c.get("/queue").then((r) => r.data),
+  get: (params) => c.get("/queue", { params }).then((r) => r.data),
 };

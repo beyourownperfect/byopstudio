@@ -1,4 +1,11 @@
-export const todayISO = () => new Date().toISOString().slice(0, 10);
+export const toLocalDateStr = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+export const todayISO = () => toLocalDateStr(new Date());
 
 export const fmtDate = (iso) => {
   if (!iso) return "";
@@ -21,7 +28,7 @@ export const fmtDateShort = (iso) => {
 export const isoAdd = (iso, days) => {
   const d = iso ? new Date(iso + "T00:00:00") : new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 };
 
 export const relDays = (iso) => {
@@ -54,13 +61,13 @@ export const startOfWeek = (iso) => {
   const d = iso ? new Date(iso + "T00:00:00") : new Date();
   const day = d.getDay(); // 0=Sun
   d.setDate(d.getDate() - day);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 };
 
 export const monthStart = (year, month) => `${year}-${String(month + 1).padStart(2, "0")}-01`;
 export const monthEnd = (year, month) => {
   const d = new Date(year, month + 1, 0);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 };
 
 export const debounce = (fn, ms = 250) => {

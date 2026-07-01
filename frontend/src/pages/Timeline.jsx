@@ -4,7 +4,7 @@ import { Plus, ChevronLeft, ChevronRight, Calendar as CalIcon, ArrowRight, Clock
 import { timelineApi, calendarApi, revisitsApi, queueApi } from "@/lib/api";
 import { SUBJECT_LABELS, CATEGORIES, TID } from "@/lib/constants";
 import { subjectColor } from "@/lib/gateSyllabus";
-import { todayISO, fmtDateLong, fmtDuration, isoAdd, startOfWeek, relLabel } from "@/lib/dateUtils";
+import { todayISO, fmtDateLong, fmtDuration, isoAdd, startOfWeek, relLabel, toLocalDateStr } from "@/lib/dateUtils";
 import TimelineEntryModal from "@/components/TimelineEntryModal";
 import HelpButton from "@/components/HelpButton";
 import { HELP_CONTENT } from "@/lib/helpContent";
@@ -48,12 +48,12 @@ export default function Timeline() {
   const { rangeStart, rangeEnd } = useMemo(() => {
     if (view === "daily") return { rangeStart: selectedDate, rangeEnd: selectedDate };
     if (view === "weekly") {
-      const sow = startOfWeek(cursor.toISOString().slice(0, 10));
+      const sow = startOfWeek(toLocalDateStr(cursor));
       return { rangeStart: sow, rangeEnd: isoAdd(sow, 6) };
     }
     const y = cursor.getFullYear(), m = cursor.getMonth();
     const start = `${y}-${String(m + 1).padStart(2, "0")}-01`;
-    const end = new Date(y, m + 1, 0).toISOString().slice(0, 10);
+    const end = `${y}-${String(m + 1).padStart(2, "0")}-${String(new Date(y, m + 1, 0).getDate()).padStart(2, "0")}`;
     return { rangeStart: start, rangeEnd: end };
   }, [view, cursor, selectedDate]);
 
@@ -100,7 +100,7 @@ export default function Timeline() {
     else if (view === "weekly") d.setDate(d.getDate() + 7 * dir);
     else d.setMonth(d.getMonth() + dir);
     setCursor(d);
-    if (view === "daily") setSelectedDate(d.toISOString().slice(0, 10));
+    if (view === "daily") setSelectedDate(toLocalDateStr(d));
   };
 
   const dayMap = useMemo(() => {
@@ -299,7 +299,7 @@ function MonthlyView({ cursor, dayMap, calMap, selectedDate, setSelectedDate, op
         <div className="grid grid-cols-7 gap-1.5">
           {cells.map((d, i) => {
             if (!d) return <div key={i} />;
-            const ds = d.toISOString().slice(0, 10);
+            const ds = toLocalDateStr(d);
             const data = dayMap[ds];
             const c = calMap[ds];
             const isToday = ds === todayISO();

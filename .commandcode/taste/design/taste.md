@@ -8,3 +8,4 @@
 - Avoid duplicating widgets or information across pages — keep a single canonical instance (e.g., one global countdown in the header, not per-page copies). Confidence: 0.70
 - Design list-based sections like Today's Mission and Execution Queue to handle growth gracefully — use collapsible groups, scrollable containers, and high information density so vertical space stays bounded even with many items. Confidence: 0.70
 - Each page should have one clearly dominant primary action button; all other controls should be visually secondary to reduce cognitive competition and create a more polished feel. Confidence: 0.75
+- Base exam prep app architecture, feature priority, subject-wise practice, and analytics on the actual exam pattern's sectional weightage (marks, questions, time limits per section) — design for balanced multi-subject preparation rather than assuming some sections are more important. Confidence: 0.70
